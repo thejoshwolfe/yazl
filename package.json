@@ -1,0 +1,22 @@
+{
+  "name": "yazl",
+  "version": "0.0.0",
+  "description": "yet another zip library for node",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/thejoshwolfe/yazl.git"
+  },
+  "keywords": [
+    "zip"
+  ],
+  "author": "Josh Wolfe <thejoshwolfe@gmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/thejoshwolfe/yazl/issues"
+  },
+  "homepage": "https://github.com/thejoshwolfe/yazl"
+}
