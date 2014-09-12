@@ -27,14 +27,19 @@ function ZipFile(outputStream, options) {
   this.ended = false;
 }
 
-ZipFile.prototype.addFile = function(realPath, options) {
+ZipFile.prototype.addFile = function(realPath, metadataPath, options) {
   var self = this;
-  var metadataPath = getMetadataPath(options, realPath);
+  validateMetadataPath(metadataPath);
 
   var entry = new Entry(metadataPath, options);
   self.entries.push(entry);
   fs.open(realPath, "r", function(err, fd) {
     if (err) return self.emit("error", err);
+    function closeFd() {
+      fs.close(fd, function(err) {
+        if (err) self.emit("error", err);
+      });
+    }
     fs.fstat(fd, function(err, stats) {
       if (err) return self.emit("error", err);
       if (!stats.isFile()) return self.emit("error", new Error("not a file: " + realPath));
@@ -44,10 +49,14 @@ ZipFile.prototype.addFile = function(realPath, options) {
         var readStream = fs.createReadStream(null, {fd: fd});
         readStream.on("error", function(err) {
           self.emit("error", err);
+          closeFd();
+        });
+        readStream.on("end", function() {
+          closeFd();
         });
         var compressedSizeCounter = new ByteCounter();
         readStream.pipe(compressedSizeCounter, {end: false}).pipe(self.outputStream);
-        readStream.on("end", function() {
+        compressedSizeCounter.on("finish", function() {
           // TODO: compression sometimes i guess
           entry.compressedSize = compressedSizeCounter.byteCount;
           self.outputStreamCursor += entry.compressedSize;
@@ -58,21 +67,6 @@ ZipFile.prototype.addFile = function(realPath, options) {
       pumpEntries(self);
     });
   });
-};
-
-ZipFile.prototype.addBuffer = function(buffer, options) {
-  var self = this;
-  var metadataPath = getMetadataPath(options);
-  var entry = new Entry(metadataPath, options);
-  if (options.mtime == null) throw new Error("missing mtime");
-  entry.setLastModDate(options.mtime);
-  self.entries.push(entry);
-  entry.setFileDataPumpFunction(function() {
-    writeToOutputStream(self, buffer);
-    entry.state = Entry.FILE_DATA_DONE;
-    pumpEntries(self);
-  });
-  pumpEntries(self);
 };
 
 ZipFile.NO_COMPRESSION = 0;
@@ -117,13 +111,7 @@ function pumpEntries(self) {
   }
 }
 
-function getMetadataPath(options, realPath) {
-  var metadataPath = options.metadataPath;
-  if (metadataPath == null) {
-    if (realPath == null) throw new Error("missing metadataPath");
-    if (options.archiveRootPath == null) throw new Error("one of metadataPath or archiveRootPath is required");
-    metadataPath = path.relative(options.archiveRootPath, realPath);
-  }
+function validateMetadataPath(metadataPath) {
   if (metadataPath.indexOf("\\") !== -1) throw new Error("invalid characters in path: " + metadataPath);
   if (/^[a-zA-Z]:/.test(metadataPath) || /^\//.test(metadataPath)) throw new Error("absolute path: " + metadataPath);
   if (metadataPath.split("/").indexOf("..") !== -1) throw new Error("invalid relative path: " + metadataPath);
