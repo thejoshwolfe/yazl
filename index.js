@@ -3,6 +3,7 @@ var fs = require("fs");
 var path = require("path");
 var Transform = require("stream").Transform;
 var util = require("util");
+var EventEmitter = require("events").EventEmitter;
 
 exports.open = open;
 exports.ZipFile = ZipFile;
@@ -13,14 +14,13 @@ function open(path, callback) {
   fs.open(path, "w", function(err, fd) {
     if (err) return callback(err);
     var outputStream = fs.createWriteStream(path, {fd: fd});
-    callback(null, new ZipFile(outputStream, {autoClose: true}));
+    callback(null, new ZipFile(outputStream));
   });
 }
 
-function ZipFile(outputStream, options) {
+util.inherits(ZipFile, EventEmitter);
+function ZipFile(outputStream) {
   this.outputStream = outputStream;
-  options = options || {autoClose: false};
-  this.autoClose = !!options.autoClose;
   this.entries = [];
   this.centralDirectoryBuffers = [];
   this.outputStreamCursor = 0;
@@ -30,6 +30,7 @@ function ZipFile(outputStream, options) {
 ZipFile.prototype.addFile = function(realPath, metadataPath, options) {
   var self = this;
   validateMetadataPath(metadataPath);
+  if (options == null) options = {};
 
   var entry = new Entry(metadataPath, options);
   self.entries.push(entry);
@@ -123,7 +124,7 @@ function Entry(metadataPath, options) {
   this.utf8FileName = new Buffer(metadataPath);
   if (this.utf8FileName.length > 0xffff) throw new Error("utf8 file name too long. " + utf8FileName.length + " > " + 0xffff);
   this.state = Entry.WAITING_FOR_METADATA;
-  if (options.extraFields != null) this.setExtraFields(options.extraFields);
+  this.setExtraFields(options.extraFields != null ? options.extraFields : []);
 }
 Entry.WAITING_FOR_METADATA = 0;
 Entry.READY_TO_PUMP_FILE_DATA = 1;
@@ -211,9 +212,9 @@ function dateToDosDateTime(jsDate) {
   date |= ((jsDate.getYear() - 1980) & 0x7f) << 9; // 0-128, 1980-2108
 
   var time = 0;
-  time |= Math.floor(jsDate.getSecond() / 2); // 0-59, 0-29 (lose odd numbers)
-  time |= (jsDate.getMinute() & 0x3f) << 5; // 0-59
-  time |= (jsDate.getHour() & 0x1f) << 11; // 0-23
+  time |= Math.floor(jsDate.getSeconds() / 2); // 0-59, 0-29 (lose odd numbers)
+  time |= (jsDate.getMinutes() & 0x3f) << 5; // 0-59
+  time |= (jsDate.getHours() & 0x1f) << 11; // 0-23
 
   return {date: date, time: time};
 }
