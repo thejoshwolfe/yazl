@@ -56,6 +56,7 @@ ZipFile.prototype.addFile = function(realPath, metadataPath, options) {
           // TODO: compression sometimes i guess
           entry.compressedSize = compressedSizeCounter.byteCount;
           self.outputStreamCursor += entry.compressedSize;
+          writeToOutputStream(self, entry.getFileDescriptor());
           entry.state = Entry.FILE_DATA_DONE;
           pumpEntries(self);
         });
@@ -192,6 +193,13 @@ Entry.prototype.getLocalFileHeader = function() {
     this.extraFields,                                         // extra field (variable size)
   ]);
 };
+Entry.prototype.getFileDescriptor = function() {
+  var buffer = new Buffer(12);
+  buffer.writeUInt32LE(this.crc32, 0);            // crc-32                          4 bytes
+  buffer.writeUInt32LE(this.compressedSize, 4);   // compressed size                 4 bytes
+  buffer.writeUInt32LE(this.uncompressedSize, 8); // uncompressed size               4 bytes
+  return buffer;
+}
 Entry.prototype.getCentralDirectoryRecord = function() {
   var fixedSizeStuff = new Buffer(46);
   fixedSizeStuff.writeUInt32LE(0x02014b50, 0);                // central file header signature   4 bytes  (0x02014b50)
