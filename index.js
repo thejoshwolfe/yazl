@@ -231,9 +231,9 @@ Entry.prototype.getCentralDirectoryRecord = function() {
 
 function dateToDosDateTime(jsDate) {
   var date = 0;
-  date |= jsDate.getDay() & 0x1f; // 1-31
+  date |= jsDate.getDate() & 0x1f; // 1-31
   date |= ((jsDate.getMonth() + 1) & 0xf) << 5; // 0-11, 1-12
-  date |= ((jsDate.getYear() - 1980) & 0x7f) << 9; // 0-128, 1980-2108
+  date |= ((jsDate.getFullYear() - 1980) & 0x7f) << 9; // 0-128, 1980-2108
 
   var time = 0;
   time |= Math.floor(jsDate.getSeconds() / 2); // 0-59, 0-29 (lose odd numbers)
