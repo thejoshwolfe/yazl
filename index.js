@@ -99,13 +99,29 @@ function pumpEntries(self) {
     // all cought up on writing entries
     if (self.ended) {
       // head for the exit
+      self.offsetOfStartOfCentralDirectory = self.outputStreamCursor;
       self.entries.forEach(function(entry) {
         var centralDirectoryRecord = entry.getCentralDirectoryRecord();
         writeToOutputStream(self, centralDirectoryRecord);
       });
+      writeToOutputStream(self, getEndOfCentralDirectoryRecord(self));
       self.outputStream.end();
     }
   }
+}
+
+function getEndOfCentralDirectoryRecord(self) {
+  var buffer = new Buffer(22);
+  buffer.writeUInt32LE(0x06054b50, 0);           // end of central dir signature    4 bytes  (0x06054b50)
+  buffer.writeUInt16LE(0, 4);                    // number of this disk             2 bytes
+  buffer.writeUInt16LE(0, 6);                    // number of the disk with the     start of the central directory  2 bytes
+  buffer.writeUInt16LE(self.entries.length, 8);  // total number of entries in the  central directory on this disk  2 bytes
+  buffer.writeUInt16LE(self.entries.length, 10); // total number of entries in      the central directory           2 bytes
+  buffer.writeUInt32LE(self.outputStreamCursor - self.offsetOfStartOfCentralDirectory, 12); // size of the central directory   4 bytes
+  buffer.writeUInt32LE(self.offsetOfStartOfCentralDirectory, 16); // offset of start of central directory with respect to the starting disk number        4 bytes
+  buffer.writeUInt16LE(0, 20);                   // .ZIP file comment length        2 bytes
+  /* no comment */                               // .ZIP file comment       (variable size)
+  return buffer;
 }
 
 function validateMetadataPath(metadataPath) {
