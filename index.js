@@ -20,11 +20,15 @@ function open(path, callback) {
 
 util.inherits(ZipFile, EventEmitter);
 function ZipFile(outputStream) {
-  this.outputStream = outputStream;
-  this.entries = [];
-  this.centralDirectoryBuffers = [];
-  this.outputStreamCursor = 0;
-  this.ended = false;
+  var self = this;
+  self.outputStream = outputStream;
+  self.outputStream.on("error", function(err) {
+    self.emit("error", err);
+  });
+  self.entries = [];
+  self.centralDirectoryBuffers = [];
+  self.outputStreamCursor = 0;
+  self.ended = false;
 }
 
 ZipFile.prototype.addFile = function(realPath, metadataPath, options) {
@@ -36,11 +40,6 @@ ZipFile.prototype.addFile = function(realPath, metadataPath, options) {
   self.entries.push(entry);
   fs.open(realPath, "r", function(err, fd) {
     if (err) return self.emit("error", err);
-    function closeFd() {
-      fs.close(fd, function(err) {
-        if (err) self.emit("error", err);
-      });
-    }
     fs.fstat(fd, function(err, stats) {
       if (err) return self.emit("error", err);
       if (!stats.isFile()) return self.emit("error", new Error("not a file: " + realPath));
@@ -50,13 +49,9 @@ ZipFile.prototype.addFile = function(realPath, metadataPath, options) {
         var readStream = fs.createReadStream(null, {fd: fd});
         readStream.on("error", function(err) {
           self.emit("error", err);
-          closeFd();
-        });
-        readStream.on("end", function() {
-          closeFd();
         });
         var compressedSizeCounter = new ByteCounter();
-        readStream.pipe(compressedSizeCounter, {end: false}).pipe(self.outputStream);
+        readStream.pipe(compressedSizeCounter).pipe(self.outputStream, {end: false});
         compressedSizeCounter.on("finish", function() {
           // TODO: compression sometimes i guess
           entry.compressedSize = compressedSizeCounter.byteCount;
@@ -108,6 +103,7 @@ function pumpEntries(self) {
         var centralDirectoryRecord = entry.getCentralDirectoryRecord();
         writeToOutputStream(self, centralDirectoryRecord);
       });
+      self.outputStream.end();
     }
   }
 }
@@ -125,6 +121,8 @@ function Entry(metadataPath, options) {
   if (this.utf8FileName.length > 0xffff) throw new Error("utf8 file name too long. " + utf8FileName.length + " > " + 0xffff);
   this.state = Entry.WAITING_FOR_METADATA;
   this.setExtraFields(options.extraFields != null ? options.extraFields : []);
+  // i promise this is the crc32 :|
+  this.crc32 = 0x12341234;
 }
 Entry.WAITING_FOR_METADATA = 0;
 Entry.READY_TO_PUMP_FILE_DATA = 1;
