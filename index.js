@@ -4,6 +4,7 @@ var path = require("path");
 var Transform = require("stream").Transform;
 var util = require("util");
 var EventEmitter = require("events").EventEmitter;
+var crc32 = require("buffer-crc32");
 
 exports.open = open;
 exports.ZipFile = ZipFile;
@@ -50,10 +51,12 @@ ZipFile.prototype.addFile = function(realPath, metadataPath, options) {
         readStream.on("error", function(err) {
           self.emit("error", err);
         });
+        var crc32Watcher = new Crc32Watcher();
         var compressedSizeCounter = new ByteCounter();
-        readStream.pipe(compressedSizeCounter).pipe(self.outputStream, {end: false});
+        readStream.pipe(crc32Watcher).pipe(compressedSizeCounter).pipe(self.outputStream, {end: false});
         compressedSizeCounter.on("finish", function() {
-          // TODO: compression sometimes i guess
+          entry.crc32 = crc32Watcher.crc32;
+          console.log("crc32: " + entry.crc32.toString(16));
           entry.compressedSize = compressedSizeCounter.byteCount;
           self.outputStreamCursor += entry.compressedSize;
           writeToOutputStream(self, entry.getFileDescriptor());
@@ -138,8 +141,6 @@ function Entry(metadataPath, options) {
   if (this.utf8FileName.length > 0xffff) throw new Error("utf8 file name too long. " + utf8FileName.length + " > " + 0xffff);
   this.state = Entry.WAITING_FOR_METADATA;
   this.setExtraFields(options.extraFields != null ? options.extraFields : []);
-  // i promise this is the crc32 :|
-  this.crc32 = 0x12341234;
 }
 Entry.WAITING_FOR_METADATA = 0;
 Entry.READY_TO_PUMP_FILE_DATA = 1;
@@ -252,5 +253,15 @@ function ByteCounter(options) {
 }
 ByteCounter.prototype._transform = function(chunk, encoding, cb) {
   this.byteCount += chunk.length;
+  cb(null, chunk);
+};
+
+util.inherits(Crc32Watcher, Transform);
+function Crc32Watcher(options) {
+  Transform.call(this, options);
+  this.crc32 = 0;
+}
+Crc32Watcher.prototype._transform = function(chunk, encoding, cb) {
+  this.crc32 = crc32.unsigned(chunk, this.crc32);
   cb(null, chunk);
 };
