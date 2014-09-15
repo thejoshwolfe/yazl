@@ -1,35 +1,20 @@
 
 var fs = require("fs");
-var path = require("path");
 var Transform = require("stream").Transform;
+var PassThrough = require("stream").PassThrough;
 var util = require("util");
 var EventEmitter = require("events").EventEmitter;
 var crc32 = require("buffer-crc32");
 
-exports.open = open;
 exports.ZipFile = ZipFile;
 exports.dateToDosDateTime = dateToDosDateTime;
 
-function open(path, callback) {
-  if (callback == null) callback = defaultCallback;
-  fs.open(path, "w", function(err, fd) {
-    if (err) return callback(err);
-    var outputStream = fs.createWriteStream(path, {fd: fd});
-    callback(null, new ZipFile(outputStream));
-  });
-}
-
 util.inherits(ZipFile, EventEmitter);
-function ZipFile(outputStream) {
-  var self = this;
-  self.outputStream = outputStream;
-  self.outputStream.on("error", function(err) {
-    self.emit("error", err);
-  });
-  self.entries = [];
-  self.centralDirectoryBuffers = [];
-  self.outputStreamCursor = 0;
-  self.ended = false;
+function ZipFile() {
+  this.outputStream = new PassThrough();
+  this.entries = [];
+  this.outputStreamCursor = 0;
+  this.ended = false;
 }
 
 ZipFile.prototype.addFile = function(realPath, metadataPath, options) {
@@ -49,6 +34,7 @@ ZipFile.prototype.addFile = function(realPath, metadataPath, options) {
       // http://unix.stackexchange.com/questions/14705/the-zip-formats-external-file-attribute/14727#14727
       entry.externalFileAttributes = (stats.mode << 16) >>> 0;
       entry.setFileDataPumpFunction(function() {
+        entry.state = Entry.FILE_DATA_IN_PROGRESS;
         var readStream = fs.createReadStream(null, {fd: fd});
         readStream.on("error", function(err) {
           self.emit("error", err);
@@ -95,6 +81,7 @@ function pumpEntries(self) {
   if (entry != null) {
     // this entry is not done yet
     if (entry.state < Entry.READY_TO_PUMP_FILE_DATA) return; // input file not open yet
+    if (entry.state === Entry.FILE_DATA_IN_PROGRESS) return; // we'll get there
     // start with local file header
     entry.relativeOffsetOfLocalHeader = self.outputStreamCursor;
     var localFileHeader = entry.getLocalFileHeader();
@@ -145,7 +132,8 @@ function Entry(metadataPath, options) {
 }
 Entry.WAITING_FOR_METADATA = 0;
 Entry.READY_TO_PUMP_FILE_DATA = 1;
-Entry.FILE_DATA_DONE = 2;
+Entry.FILE_DATA_IN_PROGRESS = 2;
+Entry.FILE_DATA_DONE = 3;
 Entry.prototype.setExtraFields = function(extraFields) {
   var extraFieldBuffers = [];
   extraFields.forEach(function(extraField) {
@@ -204,28 +192,28 @@ Entry.prototype.getFileDescriptor = function() {
 }
 Entry.prototype.getCentralDirectoryRecord = function() {
   var fixedSizeStuff = new Buffer(46);
-  fixedSizeStuff.writeUInt32LE(0x02014b50, 0);                   // central file header signature   4 bytes  (0x02014b50)
-  fixedSizeStuff.writeUInt16LE(VERSION_MADE_BY_INFO_ZIP, 4);     // version made by                 2 bytes
-  fixedSizeStuff.writeUInt16LE(VERSION_NEEDED_TO_EXTRACT, 6);    // version needed to extract       2 bytes
-  fixedSizeStuff.writeUInt16LE(FILE_NAME_IS_UTF8, 8);            // general purpose bit flag        2 bytes
-  fixedSizeStuff.writeUInt16LE(ZipFile.NO_COMPRESSION, 10);      // compression method              2 bytes
-  fixedSizeStuff.writeUInt16LE(this.lastModFileTime, 12);        // last mod file time              2 bytes
-  fixedSizeStuff.writeUInt16LE(this.lastModFileDate, 14);        // last mod file date              2 bytes
-  fixedSizeStuff.writeUInt32LE(this.crc32, 16);                  // crc-32                          4 bytes
-  fixedSizeStuff.writeUInt32LE(this.compressedSize, 20);         // compressed size                 4 bytes
-  fixedSizeStuff.writeUInt32LE(this.uncompressedSize, 24);       // uncompressed size               4 bytes
-  fixedSizeStuff.writeUInt16LE(this.utf8FileName.length, 28);    // file name length                2 bytes
-  fixedSizeStuff.writeUInt16LE(this.extraFields.length, 30);     // extra field length              2 bytes
-  fixedSizeStuff.writeUInt16LE(0, 32);                           // file comment length             2 bytes
-  fixedSizeStuff.writeUInt16LE(0, 34);                           // disk number start               2 bytes
-  fixedSizeStuff.writeUInt16LE(0, 36);                           // internal file attributes        2 bytes
-  fixedSizeStuff.writeUInt32LE(this.externalFileAttributes, 38); // external file attributes        4 bytes
-  fixedSizeStuff.writeUInt32LE(0, 42);                           // relative offset of local header 4 bytes
+  fixedSizeStuff.writeUInt32LE(0x02014b50, 0);                        // central file header signature   4 bytes  (0x02014b50)
+  fixedSizeStuff.writeUInt16LE(VERSION_MADE_BY_INFO_ZIP, 4);          // version made by                 2 bytes
+  fixedSizeStuff.writeUInt16LE(VERSION_NEEDED_TO_EXTRACT, 6);         // version needed to extract       2 bytes
+  fixedSizeStuff.writeUInt16LE(FILE_NAME_IS_UTF8, 8);                 // general purpose bit flag        2 bytes
+  fixedSizeStuff.writeUInt16LE(ZipFile.NO_COMPRESSION, 10);           // compression method              2 bytes
+  fixedSizeStuff.writeUInt16LE(this.lastModFileTime, 12);             // last mod file time              2 bytes
+  fixedSizeStuff.writeUInt16LE(this.lastModFileDate, 14);             // last mod file date              2 bytes
+  fixedSizeStuff.writeUInt32LE(this.crc32, 16);                       // crc-32                          4 bytes
+  fixedSizeStuff.writeUInt32LE(this.compressedSize, 20);              // compressed size                 4 bytes
+  fixedSizeStuff.writeUInt32LE(this.uncompressedSize, 24);            // uncompressed size               4 bytes
+  fixedSizeStuff.writeUInt16LE(this.utf8FileName.length, 28);         // file name length                2 bytes
+  fixedSizeStuff.writeUInt16LE(this.extraFields.length, 30);          // extra field length              2 bytes
+  fixedSizeStuff.writeUInt16LE(0, 32);                                // file comment length             2 bytes
+  fixedSizeStuff.writeUInt16LE(0, 34);                                // disk number start               2 bytes
+  fixedSizeStuff.writeUInt16LE(0, 36);                                // internal file attributes        2 bytes
+  fixedSizeStuff.writeUInt32LE(this.externalFileAttributes, 38);      // external file attributes        4 bytes
+  fixedSizeStuff.writeUInt32LE(this.relativeOffsetOfLocalHeader, 42); // relative offset of local header 4 bytes
   return Buffer.concat([
     fixedSizeStuff,
-    this.utf8FileName,                                           // file name (variable size)
-    this.extraFields,                                            // extra field (variable size)
-    /* empty comment */                                          // file comment (variable size)
+    this.utf8FileName,                                                // file name (variable size)
+    this.extraFields,                                                 // extra field (variable size)
+    /* empty comment */                                               // file comment (variable size)
   ]);
 };
 
