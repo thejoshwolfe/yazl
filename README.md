@@ -2,6 +2,80 @@
 
 yet another zip library for node
 
+Design principles:
+
+ * Don't block the JavaScript thread.
+   Use and provide async APIs.
+ * Keep memory usage under control.
+   Don't attempt to buffer entire files in RAM at once.
+ * Catch unsafe filenames entries.
+   `addFile()` throws an error if its file name starts with `"/"` or `/[A-Za-z]:\//`
+   or if it contains `".."` path segments or `"\\"` (per the spec).
+
+## Usage
+
+```js
+var yazl = require("yazl");
+
+var zipfile = new yazl.ZipFile();
+zipfile.addFile("file1.txt", "file1.txt");
+// (add only files, not directories)
+zipfile.addFile("path/to/file.txt", "path/in/zipfile.txt");
+zipfile.end();
+zipfile.outputStream.pipe(fs.createWriteStream("output.zip")).on("finish", function() {
+  console.log("done");
+});
+```
+
+## API
+
+### Class: ZipFile
+
+#### new ZipFile()
+
+No parameters.
+Nothing can go wrong.
+
+#### addFile(realPath, metadataPath)
+
+Adds a file from the file system at `realPath` into the zipfile as `metadataPath`.
+Typically `metadataPath` would be calculated as `path.relative(root, realPath)`.
+Unzip programs would extract the file from the zipfile as `metadataPath`.
+`realPath` is not stored in the zipfile.
+
+The path should be a regular file, not a directory or symlink, etc.
+The mtime and unix permission bits are stored in the file
+(in the fields "last mod file time", "last mod file date", and "external file attributes").
+yazl does not store group and user ids in the zip file
+(note that Info-Zip does do this in the field "extra fields".).
+
+Internally, `fs.open()` is called immediately in the `addFile` function,
+and the fd obtained is later used for getting stats and file data.
+So theoretically, clients could delete the file from the file system immediately after calling this function,
+and yazl would be able to function without any trouble.
+
+#### end()
+
+Indicates that no more files will be added via `addFile()`.
+Some time after calling this function, `outputStream` will be ended.
+
+#### outputStream
+
+A readable stream that will produce the contents of the zip file.
+It is typical to pipe this stream to a writable stream created from `fs.createWriteStream()`.
+
+Internally, large amounts of file data are piped to `outputStream` using `pipe()`,
+which means throttling happens appropriately when this stream is piped to a slow destination.
+
+Data becomes available in this stream soon after calling `addFile()` for the first time.
+Clients can call `pipe()` on this stream immediately after getting a new `ZipFile` instance.
+It is not necessary to add all files and call `end()` before calling `pipe()` on this stream.
+
+### dateToDosDateTime(jsDate)
+
+`jsDate` is a `Date` instance.
+Returns `{date: date, time: time}`, where `date` and `time` are unsigned 16-bit integers.
+
 ## Output Structure
 
 The Zip File Spec leaves a lot of flexibility up to the zip file creator.

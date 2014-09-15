@@ -124,30 +124,15 @@ function validateMetadataPath(metadataPath) {
 }
 
 // this class is not part of the public API
-function Entry(metadataPath, options) {
+function Entry(metadataPath) {
   this.utf8FileName = new Buffer(metadataPath);
   if (this.utf8FileName.length > 0xffff) throw new Error("utf8 file name too long. " + utf8FileName.length + " > " + 0xffff);
   this.state = Entry.WAITING_FOR_METADATA;
-  this.setExtraFields(options.extraFields != null ? options.extraFields : []);
 }
 Entry.WAITING_FOR_METADATA = 0;
 Entry.READY_TO_PUMP_FILE_DATA = 1;
 Entry.FILE_DATA_IN_PROGRESS = 2;
 Entry.FILE_DATA_DONE = 3;
-Entry.prototype.setExtraFields = function(extraFields) {
-  var extraFieldBuffers = [];
-  extraFields.forEach(function(extraField) {
-    var id = extraField.id;
-    var data = extraField.data;
-    var headerBuffer = new Buffer(4);
-    headerBuffer.writeUInt16LE(id, 0);
-    headerBuffer.writeUInt16LE(data.length, 2);
-    extraFieldBuffers.push(headerBuffer);
-    extraFieldBuffers.push(data);
-  });
-  this.extraFields = Buffer.concat(extraFieldBuffers);
-  if (this.extraFields.length > 0xffff) throw new Error("extra fields too long. " + extraFields.length + " > " + 0xffff);
-};
 Entry.prototype.setLastModDate = function(date) {
   var dosDateTime = dateToDosDateTime(date);
   this.lastModFileTime = dosDateTime.time;
@@ -176,11 +161,11 @@ Entry.prototype.getLocalFileHeader = function() {
   fixedSizeStuff.writeUInt32LE(0, 18);                        // compressed size                 4 bytes
   fixedSizeStuff.writeUInt32LE(0, 22);                        // uncompressed size               4 bytes
   fixedSizeStuff.writeUInt16LE(this.utf8FileName.length, 26); // file name length                2 bytes
-  fixedSizeStuff.writeUInt16LE(this.extraFields.length, 28);  // extra field length              2 bytes
+  fixedSizeStuff.writeUInt16LE(0, 28);                        // extra field length              2 bytes
   return Buffer.concat([
     fixedSizeStuff,
     this.utf8FileName,                                        // file name (variable size)
-    this.extraFields,                                         // extra field (variable size)
+    /* no extra fields */                                     // extra field (variable size)
   ]);
 };
 Entry.prototype.getFileDescriptor = function() {
@@ -203,7 +188,7 @@ Entry.prototype.getCentralDirectoryRecord = function() {
   fixedSizeStuff.writeUInt32LE(this.compressedSize, 20);              // compressed size                 4 bytes
   fixedSizeStuff.writeUInt32LE(this.uncompressedSize, 24);            // uncompressed size               4 bytes
   fixedSizeStuff.writeUInt16LE(this.utf8FileName.length, 28);         // file name length                2 bytes
-  fixedSizeStuff.writeUInt16LE(this.extraFields.length, 30);          // extra field length              2 bytes
+  fixedSizeStuff.writeUInt16LE(0, 30);                                // extra field length              2 bytes
   fixedSizeStuff.writeUInt16LE(0, 32);                                // file comment length             2 bytes
   fixedSizeStuff.writeUInt16LE(0, 34);                                // disk number start               2 bytes
   fixedSizeStuff.writeUInt16LE(0, 36);                                // internal file attributes        2 bytes
@@ -212,7 +197,7 @@ Entry.prototype.getCentralDirectoryRecord = function() {
   return Buffer.concat([
     fixedSizeStuff,
     this.utf8FileName,                                                // file name (variable size)
-    this.extraFields,                                                 // extra field (variable size)
+    /* no extra fields */                                             // extra field (variable size)
     /* empty comment */                                               // file comment (variable size)
   ]);
 };
