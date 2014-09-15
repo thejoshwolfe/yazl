@@ -8,9 +8,6 @@ Design principles:
    Use and provide async APIs.
  * Keep memory usage under control.
    Don't attempt to buffer entire files in RAM at once.
- * Catch unsafe filenames entries.
-   `addFile()` throws an error if its file name starts with `"/"` or `/[A-Za-z]:\//`
-   or if it contains `".."` path segments or `"\\"` (per the spec).
 
 ## Usage
 
@@ -22,6 +19,7 @@ zipfile.addFile("file1.txt", "file1.txt");
 // (add only files, not directories)
 zipfile.addFile("path/to/file.txt", "path/in/zipfile.txt");
 zipfile.end();
+// pipe() can be called any time after the constructor
 zipfile.outputStream.pipe(fs.createWriteStream("output.zip")).on("finish", function() {
   console.log("done");
 });
@@ -43,11 +41,14 @@ Typically `metadataPath` would be calculated as `path.relative(root, realPath)`.
 Unzip programs would extract the file from the zipfile as `metadataPath`.
 `realPath` is not stored in the zipfile.
 
+This function throws an error if `metadataPath` starts with `"/"` or `/[A-Za-z]:\//`
+or if it contains `".."` path segments or `"\\"`.
+These would be illegal file names according to the spec.
+
 The path should be a regular file, not a directory or symlink, etc.
 The mtime and unix permission bits are stored in the file
 (in the fields "last mod file time", "last mod file date", and "external file attributes").
-yazl does not store group and user ids in the zip file
-(note that Info-Zip does do this in the field "extra fields".).
+yazl does not store group and user ids in the zip file.
 
 Internally, `fs.open()` is called immediately in the `addFile` function,
 and the fd obtained is later used for getting stats and file data.
