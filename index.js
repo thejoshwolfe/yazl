@@ -30,30 +30,62 @@ ZipFile.prototype.addFile = function(realPath, metadataPath, options) {
       if (err) return self.emit("error", err);
       if (!stats.isFile()) return self.emit("error", new Error("not a file: " + realPath));
       entry.uncompressedSize = stats.size;
-      entry.setLastModDate(stats.mtime);
-      // http://unix.stackexchange.com/questions/14705/the-zip-formats-external-file-attribute/14727#14727
-      entry.externalFileAttributes = (stats.mode << 16) >>> 0;
+      if (entry.lastModFileTime == null || entry.lastModFileDate == null) entry.setLastModDate(stats.mtime);
+      if (entry.externalFileAttributes == null) entry.setFileAttributesMode(stats.mode);
       entry.setFileDataPumpFunction(function() {
         entry.state = Entry.FILE_DATA_IN_PROGRESS;
         var readStream = fs.createReadStream(null, {fd: fd});
         readStream.on("error", function(err) {
           self.emit("error", err);
         });
-        var crc32Watcher = new Crc32Watcher();
-        var compressedSizeCounter = new ByteCounter();
-        readStream.pipe(crc32Watcher).pipe(compressedSizeCounter).pipe(self.outputStream, {end: false});
-        compressedSizeCounter.on("finish", function() {
-          entry.crc32 = crc32Watcher.crc32;
-          entry.compressedSize = compressedSizeCounter.byteCount;
-          self.outputStreamCursor += entry.compressedSize;
-          writeToOutputStream(self, entry.getFileDescriptor());
-          entry.state = Entry.FILE_DATA_DONE;
-          pumpEntries(self);
-        });
+        pumpFileDataReadStream(self, entry, readStream);
       });
       pumpEntries(self);
     });
   });
+};
+
+ZipFile.prototype.addReadStream = function(readStream, metadataPath, options) {
+  var self = this;
+  validateMetadataPath(metadataPath);
+  if (options == null) options = {};
+  var entry = new Entry(metadataPath, options);
+  validateFilelessEntryProperties(entry);
+  self.entries.push(entry);
+  entry.setFileDataPumpFunction(function() {
+    pumpFileDataReadStream(self, entry, readStream);
+    pumpEntries(self);
+  });
+  pumpEntries(self);
+};
+
+ZipFile.prototype.addBuffer = function(buffer, metadataPath, options) {
+  var self = this;
+  validateMetadataPath(metadataPath);
+  if (options == null) options = {};
+  var entry = new Entry(metadataPath, options);
+  validateFilelessEntryProperties(entry);
+  entry.crc32 = crc32.unsigned(buffer);
+  self.entries.push(entry);
+  // no compression support yet
+  if (true) {
+    setCompressedBuffer(buffer);
+  } else {
+    // yagni violation alert!
+    zlib.deflateRaw(buffer, function(err, compressedBuffer) {
+      setCompressedBuffer(compressedBuffer);
+    });
+  }
+  function setCompressedBuffer(compressedBuffer) {
+    entry.compressedSize = compressedBuffer.length;
+    entry.setFileDataPumpFunction(function() {
+      writeToOutputStream(self, compressedBuffer);
+      writeToOutputStream(self, entry.getFileDescriptor());
+      entry.state = Entry.FILE_DATA_DONE;
+      pumpEntries(self);
+    });
+    pumpEntries(self);
+  }
 };
 
 ZipFile.NO_COMPRESSION = 0;
@@ -68,6 +100,33 @@ function writeToOutputStream(self, buffer) {
   self.outputStream.write(buffer);
   self.outputStreamCursor += buffer.length;
 }
+
+function pumpFileDataReadStream(self, entry, readStream) {
+  var crc32Watcher = new Crc32Watcher();
+  var uncompressedSizeCounter = new ByteCounter();
+  // no compression support yet
+  var compressor = new PassThrough();
+  var compressedSizeCounter = new ByteCounter();
+  readStream.pipe(crc32Watcher)
+            .pipe(uncompressedSizeCounter)
+            .pipe(compressor)
+            .pipe(compressedSizeCounter)
+            .pipe(self.outputStream, {end: false});
+  compressedSizeCounter.on("finish", function() {
+    entry.crc32 = crc32Watcher.crc32;
+    if (entry.uncompressedSize == null) {
+      entry.uncompressedSize = uncompressedSizeCounter.byteCount;
+    } else {
+      if (entry.uncompressedSize !== uncompressedSizeCounter.byteCount) return self.emit("error", new Error("file data stream has unexpected number of bytes"));
+    }
+    if (entry.compressedSize == null) entry.compressedSize = compressedSizeCounter.byteCount;
+    self.outputStreamCursor += entry.compressedSize;
+    writeToOutputStream(self, entry.getFileDescriptor());
+    entry.state = Entry.FILE_DATA_DONE;
+    pumpEntries(self);
+  });
+}
+
 
 function pumpEntries(self) {
   var entry = getFirstNotDoneEntry();
@@ -120,14 +179,22 @@ function validateMetadataPath(metadataPath) {
   if (metadataPath.indexOf("\\") !== -1) throw new Error("invalid characters in path: " + metadataPath);
   if (/^[a-zA-Z]:/.test(metadataPath) || /^\//.test(metadataPath)) throw new Error("absolute path: " + metadataPath);
   if (metadataPath.split("/").indexOf("..") !== -1) throw new Error("invalid relative path: " + metadataPath);
-  return metadataPath;
+}
+function validateFilelessEntryProperties(entry) {
+  if (entry.lastModFileTime == null || entry.lastModFileDate == null) throw new Error("missing options.mtime");
+  if (entry.externalFileAttributes == null) throw new Error("missing options.mode");
+  if (entry.uncompressedSize !== buffer.length) throw new Error("invalid options.size");
 }
 
 // this class is not part of the public API
-function Entry(metadataPath) {
+function Entry(metadataPath, options) {
   this.utf8FileName = new Buffer(metadataPath);
   if (this.utf8FileName.length > 0xffff) throw new Error("utf8 file name too long. " + utf8FileName.length + " > " + 0xffff);
   this.state = Entry.WAITING_FOR_METADATA;
+  if (options.mtime != null) this.setLastModDate(options.mtime);
+  if (options.mode != null) this.setFileAttributesMode(options.mode);
+  this.uncompressedSize = null; // unknown
+  if (options.size != null) this.uncompressedSize = options.size;
 }
 Entry.WAITING_FOR_METADATA = 0;
 Entry.READY_TO_PUMP_FILE_DATA = 1;
@@ -137,6 +204,11 @@ Entry.prototype.setLastModDate = function(date) {
   var dosDateTime = dateToDosDateTime(date);
   this.lastModFileTime = dosDateTime.time;
   this.lastModFileDate = dosDateTime.date;
+};
+Entry.prototype.setFileAttributesMode = function(mode) {
+  if ((mode & 0xffff) !== mode) throw new Error("invalid mode. expected: 0 <= " + mode + " <= " + 0xffff);
+  // http://unix.stackexchange.com/questions/14705/the-zip-formats-external-file-attribute/14727#14727
+  this.externalFileAttributes = (mode << 16) >>> 0;
 };
 Entry.prototype.setFileDataPumpFunction = function(doFileDataPump) {
   this.doFileDataPump = doFileDataPump;

@@ -18,11 +18,19 @@ var zipfile = new yazl.ZipFile();
 zipfile.addFile("file1.txt", "file1.txt");
 // (add only files, not directories)
 zipfile.addFile("path/to/file.txt", "path/in/zipfile.txt");
-zipfile.end();
 // pipe() can be called any time after the constructor
 zipfile.outputStream.pipe(fs.createWriteStream("output.zip")).on("finish", function() {
   console.log("done");
 });
+zipfile.addReadStream(process.stdin, "stdin.txt", {
+  mtime: new Date(),
+  mode: 0100664, // -rw-rw-r--
+});
+zipfile.addBuffer(new Buffer("hello"), "hello.txt", {
+  mtime: new Date(),
+  mode: 0100664, // -rw-rw-r--
+});
+zipfile.end();
 ```
 
 ## API
@@ -34,7 +42,7 @@ zipfile.outputStream.pipe(fs.createWriteStream("output.zip")).on("finish", funct
 No parameters.
 Nothing can go wrong.
 
-#### addFile(realPath, metadataPath)
+#### addFile(realPath, metadataPath, [options])
 
 Adds a file from the file system at `realPath` into the zipfile as `metadataPath`.
 Typically `metadataPath` would be calculated as `path.relative(root, realPath)`.
@@ -45,9 +53,19 @@ This function throws an error if `metadataPath` starts with `"/"` or `/[A-Za-z]:
 or if it contains `".."` path segments or `"\\"`.
 These would be illegal file names according to the spec.
 
-The path should be a regular file, not a directory or symlink, etc.
-The mtime and unix permission bits are stored in the file
-(in the fields "last mod file time", "last mod file date", and "external file attributes").
+`options` may be omitted or null has the following structure and default values:
+
+```js
+{
+  mtime: stats.mtime, // optional
+  mode: stats.mode,   // optional
+}
+```
+
+Use `options.mtime` and/or `options.mode` to override the values
+that would normally be obtained by the `fs.Stats` for the `realPath`.
+The mtime and mode (unix permission bits and file type) are stored in the zip file
+in the fields "last mod file time", "last mod file date", and "external file attributes".
 yazl does not store group and user ids in the zip file.
 
 Internally, `fs.open()` is called immediately in the `addFile` function,
@@ -55,9 +73,42 @@ and the fd obtained is later used for getting stats and file data.
 So theoretically, clients could delete the file from the file system immediately after calling this function,
 and yazl would be able to function without any trouble.
 
+#### addReadStream(readStream, metadataPath, options)
+
+Adds a file to the zip file whose content is read from `readStream`.
+See `addFile()` for info about the `metadataPath` parameter.
+`options` is an `Object` and has the following structure:
+
+```js
+{
+  mtime: new Date(), // required
+  mode: 0100664,     // required
+  size: 12345,       // optional
+}
+```
+
+See `addFile()` for the meaning of `mtime` and `mode`.
+If `size` is given, it will be checked against the actual number of bytes in the `readStream`,
+and an error will be emitted if there is a mismatch.
+
+#### addBuffer(buffer, metadataPath, options)
+
+Adds a file to the zip file whose content is `buffer`.
+See `addFile()` for info about the `metadataPath` parameter.
+`options` is an `Object` and has the following structure:
+
+```js
+{
+  mtime: new Date(), // required
+  mode: 0100664,     // required
+}
+```
+
+See `addFile()` for the meaning of `mtime` and `mode`.
+
 #### end()
 
-Indicates that no more files will be added via `addFile()`.
+Indicates that no more files will be added via `addFile()`, `addReadStream()`, or `addBuffer()`.
 Some time after calling this function, `outputStream` will be ended.
 
 #### outputStream
@@ -68,7 +119,7 @@ It is typical to pipe this stream to a writable stream created from `fs.createWr
 Internally, large amounts of file data are piped to `outputStream` using `pipe()`,
 which means throttling happens appropriately when this stream is piped to a slow destination.
 
-Data becomes available in this stream soon after calling `addFile()` for the first time.
+Data becomes available in this stream soon after calling `addFile()` or the like for the first time.
 Clients can call `pipe()` on this stream immediately after getting a new `ZipFile` instance.
 It is not necessary to add all files and call `end()` before calling `pipe()` on this stream.
 
