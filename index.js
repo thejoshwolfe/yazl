@@ -53,6 +53,7 @@ ZipFile.prototype.addReadStream = function(readStream, metadataPath, options) {
   validateFilelessEntryProperties(entry);
   self.entries.push(entry);
   entry.setFileDataPumpFunction(function() {
+    entry.state = Entry.FILE_DATA_IN_PROGRESS;
     pumpFileDataReadStream(self, entry, readStream);
     pumpEntries(self);
   });
