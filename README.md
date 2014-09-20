@@ -22,6 +22,7 @@ zipfile.addFile("path/to/file.txt", "path/in/zipfile.txt");
 zipfile.outputStream.pipe(fs.createWriteStream("output.zip")).on("finish", function() {
   console.log("done");
 });
+// alternate apis for adding files:
 zipfile.addReadStream(process.stdin, "stdin.txt", {
   mtime: new Date(),
   mode: 0100664, // -rw-rw-r--
@@ -30,6 +31,7 @@ zipfile.addBuffer(new Buffer("hello"), "hello.txt", {
   mtime: new Date(),
   mode: 0100664, // -rw-rw-r--
 });
+// call end() after all the files have been added
 zipfile.end();
 ```
 
