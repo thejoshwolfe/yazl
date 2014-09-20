@@ -1,14 +1,31 @@
-var yazl = require("../");
 var fs = require("fs");
-var path = require("path");
+var yazl = require("../");
+var yauzl = require("yauzl");
+var BufferList = require("bl");
 
-var dump_dir = path.join(__dirname, "dump");
-try { fs.mkdirSync(dump_dir); } catch (err) { }
-var dump_zip = path.join(dump_dir, "dump.zip");
+var fileMetadata = {
+  mtime: new Date(),
+  mode: 0100664,
+};
 var zipfile = new yazl.ZipFile();
 zipfile.addFile(__filename, "unicōde.txt");
-zipfile.addFile(__filename, "with/directories.txt");
+var expectedContents = fs.readFileSync(__filename);
+zipfile.addBuffer(expectedContents, "with/directories.txt", fileMetadata);
 zipfile.end();
-zipfile.outputStream.pipe(fs.createWriteStream(dump_zip)).on("finish", function() {
-  console.log("done");
-});
+zipfile.outputStream.pipe(new BufferList(function(err, data) {
+  if (err) throw err;
+  yauzl.fromBuffer(data, function(err, zipfile) {
+    if (err) throw err;
+    zipfile.on("entry", function(entry) {
+      zipfile.openReadStream(entry, function(err, readStream) {
+        if (err) throw err;
+        readStream.pipe(new BufferList(function(err, data) {
+          if (err) throw err;
+          if (expectedContents.toString("binary") !== data.toString("binary")) throw new Error("unexpected contents");
+          console.log(entry.fileName + ": pass");
+        }));
+      });
+    });
+    console.log("done: " + zipfile.entryCount);
+  });
+}));

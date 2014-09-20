@@ -64,7 +64,7 @@ ZipFile.prototype.addBuffer = function(buffer, metadataPath, options) {
   validateMetadataPath(metadataPath);
   if (options == null) options = {};
   var entry = new Entry(metadataPath, options);
-  validateFilelessEntryProperties(entry);
+  validateFilelessEntryProperties(entry, buffer.length);
   entry.crc32 = crc32.unsigned(buffer);
   self.entries.push(entry);
   // no compression support yet
@@ -180,10 +180,10 @@ function validateMetadataPath(metadataPath) {
   if (/^[a-zA-Z]:/.test(metadataPath) || /^\//.test(metadataPath)) throw new Error("absolute path: " + metadataPath);
   if (metadataPath.split("/").indexOf("..") !== -1) throw new Error("invalid relative path: " + metadataPath);
 }
-function validateFilelessEntryProperties(entry) {
+function validateFilelessEntryProperties(entry, length) {
   if (entry.lastModFileTime == null || entry.lastModFileDate == null) throw new Error("missing options.mtime");
   if (entry.externalFileAttributes == null) throw new Error("missing options.mode");
-  if (entry.uncompressedSize !== buffer.length) throw new Error("invalid options.size");
+  if (entry.uncompressedSize != null && length != null && entry.uncompressedSize !== length) throw new Error("invalid options.size");
 }
 
 // this class is not part of the public API

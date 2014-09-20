@@ -21,5 +21,9 @@
   "homepage": "https://github.com/thejoshwolfe/yazl",
   "dependencies": {
     "buffer-crc32": "~0.2.3"
+  },
+  "devDependencies": {
+    "bl": "~0.9.3",
+    "yauzl": "~2.0.0"
   }
 }
