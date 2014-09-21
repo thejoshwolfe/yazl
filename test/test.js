@@ -9,6 +9,7 @@ var fileMetadata = {
 };
 var zipfile = new yazl.ZipFile();
 zipfile.addFile(__filename, "unicōde.txt");
+zipfile.addFile(__filename, "without-compression.txt", {compress: false});
 zipfile.addReadStream(fs.createReadStream(__filename), "readStream.txt", fileMetadata);
 var expectedContents = fs.readFileSync(__filename);
 zipfile.addBuffer(expectedContents, "with/directories.txt", fileMetadata);

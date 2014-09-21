@@ -1,7 +1,7 @@
-
 var fs = require("fs");
 var Transform = require("stream").Transform;
 var PassThrough = require("stream").PassThrough;
+var zlib = require("zlib");
 var util = require("util");
 var EventEmitter = require("events").EventEmitter;
 var crc32 = require("buffer-crc32");
@@ -68,11 +68,9 @@ ZipFile.prototype.addBuffer = function(buffer, metadataPath, options) {
   validateFilelessEntryProperties(entry, buffer.length);
   entry.crc32 = crc32.unsigned(buffer);
   self.entries.push(entry);
-  // no compression support yet
-  if (true) {
+  if (!entry.compress) {
     setCompressedBuffer(buffer);
   } else {
-    // yagni violation alert!
     zlib.deflateRaw(buffer, function(err, compressedBuffer) {
       setCompressedBuffer(compressedBuffer);
     });
@@ -89,9 +87,6 @@ ZipFile.prototype.addBuffer = function(buffer, metadataPath, options) {
   }
 };
 
-ZipFile.NO_COMPRESSION = 0;
-ZipFile.DEFLATE_COMPRESSION = 8;
-
 ZipFile.prototype.end = function() {
   this.ended = true;
   pumpEntries(this);
@@ -105,8 +100,7 @@ function writeToOutputStream(self, buffer) {
 function pumpFileDataReadStream(self, entry, readStream) {
   var crc32Watcher = new Crc32Watcher();
   var uncompressedSizeCounter = new ByteCounter();
-  // no compression support yet
-  var compressor = new PassThrough();
+  var compressor = entry.compress ? new zlib.DeflateRaw() : new PassThrough();
   var compressedSizeCounter = new ByteCounter();
   readStream.pipe(crc32Watcher)
             .pipe(uncompressedSizeCounter)
@@ -120,7 +114,7 @@ function pumpFileDataReadStream(self, entry, readStream) {
     } else {
       if (entry.uncompressedSize !== uncompressedSizeCounter.byteCount) return self.emit("error", new Error("file data stream has unexpected number of bytes"));
     }
-    if (entry.compressedSize == null) entry.compressedSize = compressedSizeCounter.byteCount;
+    entry.compressedSize = compressedSizeCounter.byteCount;
     self.outputStreamCursor += entry.compressedSize;
     writeToOutputStream(self, entry.getFileDescriptor());
     entry.state = Entry.FILE_DATA_DONE;
@@ -196,6 +190,8 @@ function Entry(metadataPath, options) {
   if (options.mode != null) this.setFileAttributesMode(options.mode);
   this.uncompressedSize = null; // unknown
   if (options.size != null) this.uncompressedSize = options.size;
+  this.compress = true; // default
+  if (options.compress != null) this.compress = !!options.compress;
 }
 Entry.WAITING_FOR_METADATA = 0;
 Entry.READY_TO_PUMP_FILE_DATA = 1;
@@ -215,7 +211,7 @@ Entry.prototype.setFileDataPumpFunction = function(doFileDataPump) {
   this.doFileDataPump = doFileDataPump;
   this.state = Entry.READY_TO_PUMP_FILE_DATA;
 };
-// this version enables utf8 filename compression
+// this version enables utf8 filename encoding
 var VERSION_NEEDED_TO_EXTRACT = 0x0014;
 // this is the "version made by" reported by linux info-zip.
 var VERSION_MADE_BY_INFO_ZIP = 0x031e;
@@ -224,21 +220,21 @@ var UNKNOWN_CRC32_AND_FILE_SIZES = 1 << 3;
 Entry.prototype.getLocalFileHeader = function() {
   var fixedSizeStuff = new Buffer(30);
   var generalPurposeBitFlag = UNKNOWN_CRC32_AND_FILE_SIZES | FILE_NAME_IS_UTF8;
-  fixedSizeStuff.writeUInt32LE(0x04034b50, 0);                // local file header signature     4 bytes  (0x04034b50)
-  fixedSizeStuff.writeUInt16LE(VERSION_NEEDED_TO_EXTRACT, 4); // version needed to extract       2 bytes
-  fixedSizeStuff.writeUInt16LE(generalPurposeBitFlag, 6);     // general purpose bit flag        2 bytes
-  fixedSizeStuff.writeUInt16LE(ZipFile.NO_COMPRESSION, 8);    // compression method              2 bytes
-  fixedSizeStuff.writeUInt16LE(this.lastModFileTime, 10);     // last mod file time              2 bytes
-  fixedSizeStuff.writeUInt16LE(this.lastModFileDate, 12);     // last mod file date              2 bytes
-  fixedSizeStuff.writeUInt32LE(0, 14);                        // crc-32                          4 bytes
-  fixedSizeStuff.writeUInt32LE(0, 18);                        // compressed size                 4 bytes
-  fixedSizeStuff.writeUInt32LE(0, 22);                        // uncompressed size               4 bytes
-  fixedSizeStuff.writeUInt16LE(this.utf8FileName.length, 26); // file name length                2 bytes
-  fixedSizeStuff.writeUInt16LE(0, 28);                        // extra field length              2 bytes
+  fixedSizeStuff.writeUInt32LE(0x04034b50, 0);                  // local file header signature     4 bytes  (0x04034b50)
+  fixedSizeStuff.writeUInt16LE(VERSION_NEEDED_TO_EXTRACT, 4);   // version needed to extract       2 bytes
+  fixedSizeStuff.writeUInt16LE(generalPurposeBitFlag, 6);       // general purpose bit flag        2 bytes
+  fixedSizeStuff.writeUInt16LE(this.getCompressionMethod(), 8); // compression method              2 bytes
+  fixedSizeStuff.writeUInt16LE(this.lastModFileTime, 10);       // last mod file time              2 bytes
+  fixedSizeStuff.writeUInt16LE(this.lastModFileDate, 12);       // last mod file date              2 bytes
+  fixedSizeStuff.writeUInt32LE(0, 14);                          // crc-32                          4 bytes
+  fixedSizeStuff.writeUInt32LE(0, 18);                          // compressed size                 4 bytes
+  fixedSizeStuff.writeUInt32LE(0, 22);                          // uncompressed size               4 bytes
+  fixedSizeStuff.writeUInt16LE(this.utf8FileName.length, 26);   // file name length                2 bytes
+  fixedSizeStuff.writeUInt16LE(0, 28);                          // extra field length              2 bytes
   return Buffer.concat([
     fixedSizeStuff,
-    this.utf8FileName,                                        // file name (variable size)
-    /* no extra fields */                                     // extra field (variable size)
+    this.utf8FileName,                                          // file name (variable size)
+    /* no extra fields */                                       // extra field (variable size)
   ]);
 };
 Entry.prototype.getFileDescriptor = function() {
@@ -254,7 +250,7 @@ Entry.prototype.getCentralDirectoryRecord = function() {
   fixedSizeStuff.writeUInt16LE(VERSION_MADE_BY_INFO_ZIP, 4);          // version made by                 2 bytes
   fixedSizeStuff.writeUInt16LE(VERSION_NEEDED_TO_EXTRACT, 6);         // version needed to extract       2 bytes
   fixedSizeStuff.writeUInt16LE(FILE_NAME_IS_UTF8, 8);                 // general purpose bit flag        2 bytes
-  fixedSizeStuff.writeUInt16LE(ZipFile.NO_COMPRESSION, 10);           // compression method              2 bytes
+  fixedSizeStuff.writeUInt16LE(this.getCompressionMethod(), 10);      // compression method              2 bytes
   fixedSizeStuff.writeUInt16LE(this.lastModFileTime, 12);             // last mod file time              2 bytes
   fixedSizeStuff.writeUInt16LE(this.lastModFileDate, 14);             // last mod file date              2 bytes
   fixedSizeStuff.writeUInt32LE(this.crc32, 16);                       // crc-32                          4 bytes
@@ -273,6 +269,11 @@ Entry.prototype.getCentralDirectoryRecord = function() {
     /* no extra fields */                                             // extra field (variable size)
     /* empty comment */                                               // file comment (variable size)
   ]);
+};
+Entry.prototype.getCompressionMethod = function() {
+  var NO_COMPRESSION = 0;
+  var DEFLATE_COMPRESSION = 8;
+  return this.compress ? DEFLATE_COMPRESSION : NO_COMPRESSION;
 };
 
 function dateToDosDateTime(jsDate) {

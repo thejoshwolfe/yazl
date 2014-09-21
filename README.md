@@ -61,6 +61,7 @@ These would be illegal file names according to the spec.
 {
   mtime: stats.mtime, // optional
   mode: stats.mode,   // optional
+  compress: true,     // optional
 }
 ```
 
@@ -85,6 +86,7 @@ See `addFile()` for info about the `metadataPath` parameter.
 {
   mtime: new Date(), // required
   mode: 0100664,     // required
+  compress: true,    // optional
   size: 12345,       // optional
 }
 ```
@@ -103,6 +105,7 @@ See `addFile()` for info about the `metadataPath` parameter.
 {
   mtime: new Date(), // required
   mode: 0100664,     // required
+  compress: true,    // optional
 }
 ```
 
