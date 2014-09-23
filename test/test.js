@@ -8,6 +8,8 @@ var fileMetadata = {
   mode: 0100664,
 };
 var zipfile = new yazl.ZipFile();
+zipfile.on("fdopen", function(fd) { console.log("fdopen:", fd); });
+zipfile.on("fdclose", function(fd) { console.log("fdclose:", fd); });
 zipfile.addFile(__filename, "unicōde.txt");
 zipfile.addFile(__filename, "without-compression.txt", {compress: false});
 zipfile.addReadStream(fs.createReadStream(__filename), "readStream.txt", fileMetadata);

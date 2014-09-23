@@ -76,6 +76,8 @@ and the fd obtained is later used for getting stats and file data.
 So theoretically, clients could delete the file from the file system immediately after calling this function,
 and yazl would be able to function without any trouble.
 
+If too many open fd's scares you, see the `fdclose` event.
+
 #### addReadStream(readStream, metadataPath, options)
 
 Adds a file to the zip file whose content is read from `readStream`.
@@ -127,6 +129,19 @@ which means throttling happens appropriately when this stream is piped to a slow
 Data becomes available in this stream soon after calling `addFile()` or the like for the first time.
 Clients can call `pipe()` on this stream immediately after getting a new `ZipFile` instance.
 It is not necessary to add all files and call `end()` before calling `pipe()` on this stream.
+
+#### Event: "fdopen"
+
+Emitted shortly after a call to `addFile()` when the file has been opened.
+
+#### Event: "fdclose"
+
+Emitted after an fd opened with `addFile()` is finally closed.
+This is after all the file data has been piped to the outputStream.
+
+Clients may wish to monitor this event if they are worried about having too many open fd's at once.
+For example, calling `addFile()`, and then waiting for this event, and then calling `addFile()` again, etc.
+would result in only a single fd being open at once (for reading files).
 
 ### dateToDosDateTime(jsDate)
 

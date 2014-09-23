@@ -26,6 +26,7 @@ ZipFile.prototype.addFile = function(realPath, metadataPath, options) {
   self.entries.push(entry);
   fs.open(realPath, "r", function(err, fd) {
     if (err) return self.emit("error", err);
+    self.emit("fdopen");
     fs.fstat(fd, function(err, stats) {
       if (err) return self.emit("error", err);
       if (!stats.isFile()) return self.emit("error", new Error("not a file: " + realPath));
@@ -37,6 +38,9 @@ ZipFile.prototype.addFile = function(realPath, metadataPath, options) {
         var readStream = fs.createReadStream(null, {fd: fd});
         readStream.on("error", function(err) {
           self.emit("error", err);
+        });
+        readStream.on("close", function() {
+          self.emit("fdclose");
         });
         pumpFileDataReadStream(self, entry, readStream);
       });
