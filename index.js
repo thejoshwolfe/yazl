@@ -24,24 +24,21 @@ ZipFile.prototype.addFile = function(realPath, metadataPath, options) {
 
   var entry = new Entry(metadataPath, options);
   self.entries.push(entry);
-  fs.open(realPath, "r", function(err, fd) {
+  fs.stat(realPath, function(err, stats) {
     if (err) return self.emit("error", err);
-    fs.fstat(fd, function(err, stats) {
-      if (err) return self.emit("error", err);
-      if (!stats.isFile()) return self.emit("error", new Error("not a file: " + realPath));
-      entry.uncompressedSize = stats.size;
-      if (entry.lastModFileTime == null || entry.lastModFileDate == null) entry.setLastModDate(stats.mtime);
-      if (entry.externalFileAttributes == null) entry.setFileAttributesMode(stats.mode);
-      entry.setFileDataPumpFunction(function() {
-        entry.state = Entry.FILE_DATA_IN_PROGRESS;
-        var readStream = fs.createReadStream(null, {fd: fd});
-        readStream.on("error", function(err) {
-          self.emit("error", err);
-        });
-        pumpFileDataReadStream(self, entry, readStream);
+    if (!stats.isFile()) return self.emit("error", new Error("not a file: " + realPath));
+    entry.uncompressedSize = stats.size;
+    if (entry.lastModFileTime == null || entry.lastModFileDate == null) entry.setLastModDate(stats.mtime);
+    if (entry.externalFileAttributes == null) entry.setFileAttributesMode(stats.mode);
+    entry.setFileDataPumpFunction(function() {
+      var readStream = fs.createReadStream(realPath);
+      entry.state = Entry.FILE_DATA_IN_PROGRESS;
+      readStream.on("error", function(err) {
+        self.emit("error", err);
       });
-      pumpEntries(self);
+      pumpFileDataReadStream(self, entry, readStream);
     });
+    pumpEntries(self);
   });
 };
 
