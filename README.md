@@ -8,8 +8,8 @@ Design principles:
    Use and provide async APIs.
  * Keep memory usage under control.
    Don't attempt to buffer entire files in RAM at once.
- * Prefer to open input files one at a time than open them all at once.
-   This is slightly suboptimal for performance,
+ * Prefer to open input files one at a time than all at once.
+   This is slightly suboptimal for time performance,
    but avoids OS-imposed limits on the number of simultaneously open file handles.
 
 ## Usage
@@ -89,7 +89,7 @@ See `addFile()` for info about the `metadataPath` parameter.
 {
   mtime: new Date(), // required
   mode: 0100664,     // required
-  compress: true,    // optional
+  compress: true,    // optional (default true)
   size: 12345,       // optional
 }
 ```
@@ -108,7 +108,7 @@ See `addFile()` for info about the `metadataPath` parameter.
 {
   mtime: new Date(), // required
   mode: 0100664,     // required
-  compress: true,    // optional
+  compress: true,    // optional (default true)
 }
 ```
 
@@ -143,9 +143,9 @@ It is typical to pipe this stream to a writable stream created from `fs.createWr
 Internally, large amounts of file data are piped to `outputStream` using `pipe()`,
 which means throttling happens appropriately when this stream is piped to a slow destination.
 
-Data becomes available in this stream soon after calling `addFile()` or the like for the first time.
-Clients can call `pipe()` on this stream immediately after getting a new `ZipFile` instance.
-It is not necessary to add all files and call `end()` before calling `pipe()` on this stream.
+Data becomes available in this stream soon after calling one of `addFile()`, `addReadStream()`, or `addBuffer()`.
+Clients can call `pipe()` on this stream at any time,
+such as immediately after getting a new `ZipFile` instance, or long after calling `end()`.
 
 ### dateToDosDateTime(jsDate)
 
@@ -208,3 +208,12 @@ and is probably not significant in any modern unzip implementation.
 
 Always `stats.mode << 16`.
 This is apparently the convention for "version made by" = `0x03xx` (UNIX).
+
+### Directory Entries
+
+`yazl` does not record directories themselves as separate entries in the zipfile metadata.
+Instead, file entries with paths (such as "directory/file.txt") imply the need for their parent directories.
+Unzip clients seems to respect this style of pathing,
+and the zip file spec does not specify what is standard in this regard.
+
+Directory entries would be required to archive empty directories (see issue #4).
