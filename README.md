@@ -211,7 +211,7 @@ This is apparently the convention for "version made by" = `0x03xx` (UNIX).
 
 ### Directory Entries
 
-`yazl` does not record directories themselves as separate entries in the zipfile metadata.
+yazl does not record directories themselves as separate entries in the zipfile metadata.
 Instead, file entries with paths (such as "directory/file.txt") imply the need for their parent directories.
 Unzip clients seems to respect this style of pathing,
 and the zip file spec does not specify what is standard in this regard.
