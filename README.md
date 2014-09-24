@@ -8,6 +8,9 @@ Design principles:
    Use and provide async APIs.
  * Keep memory usage under control.
    Don't attempt to buffer entire files in RAM at once.
+ * Prefer to open input files one at a time than open them all at once.
+   This is slightly suboptimal for performance,
+   but avoids OS-imposed limits on the number of simultaneously open file handles.
 
 ## Usage
 
