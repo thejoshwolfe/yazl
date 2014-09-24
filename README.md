@@ -71,10 +71,10 @@ The mtime and mode (unix permission bits and file type) are stored in the zip fi
 in the fields "last mod file time", "last mod file date", and "external file attributes".
 yazl does not store group and user ids in the zip file.
 
-Internally, `fs.open()` is called immediately in the `addFile` function,
-and the fd obtained is later used for getting stats and file data.
-So theoretically, clients could delete the file from the file system immediately after calling this function,
-and yazl would be able to function without any trouble.
+Internally, `fs.stat()` is called immediately in the `addFile` function,
+and `fs.createReadStream()` is used later when the file data is actually required.
+Throughout adding and encoding `n` files with `addFile()`,
+the number of simultaneous open files is also `O(1)`, probably just 1.
 
 #### addReadStream(readStream, metadataPath, options)
 
