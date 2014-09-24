@@ -74,7 +74,7 @@ yazl does not store group and user ids in the zip file.
 Internally, `fs.stat()` is called immediately in the `addFile` function,
 and `fs.createReadStream()` is used later when the file data is actually required.
 Throughout adding and encoding `n` files with `addFile()`,
-the number of simultaneous open files is also `O(1)`, probably just 1.
+the number of simultaneous open files is `O(1)`, probably just 1 at a time.
 
 #### addReadStream(readStream, metadataPath, options)
 
