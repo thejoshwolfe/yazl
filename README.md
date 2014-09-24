@@ -111,10 +111,26 @@ See `addFile()` for info about the `metadataPath` parameter.
 
 See `addFile()` for the meaning of `mtime` and `mode`.
 
-#### end()
+#### end([finalSizeCallback])
 
 Indicates that no more files will be added via `addFile()`, `addReadStream()`, or `addBuffer()`.
 Some time after calling this function, `outputStream` will be ended.
+
+If specified and non-null, `finalSizeCallback` is given the parameters `(finalSize)`
+sometime during or after the call to `end()`.
+`finalSize` is of type `Number` and can either be `-1`
+or the guaranteed eventual size in bytes of the output data that can be read from `outputStream`.
+
+If `finalSize` is `-1`, it means means the final size is too hard to guess before processing the input file data.
+This will happen if and only if the `compress` option is `true` on any call to `addFile()`, `addReadStream()`, or `addBuffer()`,
+or if `addReadStream()` is called and the optional `size` option is not given.
+In other words, clients should know whether they're going to get a `-1` or a real value
+by looking at how they are calling this function.
+
+The call to `finalSizeCallback` might be delayed if yazl is still waiting for `fs.Stats` for an `addFile()` entry.
+If `addFile()` was never called, `finalSizeCallback` will be called during the call to `end()`.
+It is not required to start piping data from `outputStream` before `finalSizeCallback` is called.
+`finalSizeCallback` will be called only once, and only if this is the first call to `end()`.
 
 #### outputStream
 

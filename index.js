@@ -63,6 +63,7 @@ ZipFile.prototype.addBuffer = function(buffer, metadataPath, options) {
   if (options == null) options = {};
   var entry = new Entry(metadataPath, options);
   validateFilelessEntryProperties(entry, buffer.length);
+  entry.uncompressedSize = buffer.length;
   entry.crc32 = crc32.unsigned(buffer);
   self.entries.push(entry);
   if (!entry.compress) {
@@ -84,8 +85,10 @@ ZipFile.prototype.addBuffer = function(buffer, metadataPath, options) {
   }
 };
 
-ZipFile.prototype.end = function() {
+ZipFile.prototype.end = function(finalSizeCallback) {
+  if (this.ended) return;
   this.ended = true;
+  this.finalSizeCallback = finalSizeCallback;
   pumpEntries(this);
 };
 
@@ -119,8 +122,18 @@ function pumpFileDataReadStream(self, entry, readStream) {
   });
 }
 
-
 function pumpEntries(self) {
+  // first check if finalSize is finally known
+  if (self.ended && self.finalSizeCallback != null) {
+    var finalSize = calculateFinalSize(self);
+    if (finalSize != null) {
+      // we have an answer
+      self.finalSizeCallback(finalSize);
+      self.finalSizeCallback = null;
+    }
+  }
+
+  // pump entries
   var entry = getFirstNotDoneEntry();
   function getFirstNotDoneEntry() {
     for (var i = 0; i < self.entries.length; i++) {
@@ -153,8 +166,31 @@ function pumpEntries(self) {
   }
 }
 
+function calculateFinalSize(self) {
+  var result = 0;
+  for (var i = 0; i < self.entries.length; i++) {
+    var entry = self.entries[i];
+    // compression is too hard to predict
+    if (entry.compress) return -1;
+    if (entry.state >= Entry.READY_TO_PUMP_FILE_DATA) {
+      // if addReadStream was called without providing the size, we can't predict the final size
+      if (entry.uncompressedSize == null) return -1;
+    } else {
+      // if we're still waiting for fs.stat, we might learn the size someday
+      if (entry.uncompressedSize == null) return null;
+    }
+    result += LOCAL_FILE_HEADER_FIXED_SIZE + entry.utf8FileName.length +
+              entry.uncompressedSize +
+              FILE_DESCRIPTOR_SIZE +
+              CENTRAL_DIRECTORY_RECORD_FIXED_SIZE + entry.utf8FileName.length;
+  }
+  result += END_OF_CENTRAL_DIRECTORY_RECORD_SIZE;
+  return result;
+}
+
+var END_OF_CENTRAL_DIRECTORY_RECORD_SIZE = 22;
 function getEndOfCentralDirectoryRecord(self) {
-  var buffer = new Buffer(22);
+  var buffer = new Buffer(END_OF_CENTRAL_DIRECTORY_RECORD_SIZE);
   buffer.writeUInt32LE(0x06054b50, 0);           // end of central dir signature    4 bytes  (0x06054b50)
   buffer.writeUInt16LE(0, 4);                    // number of this disk             2 bytes
   buffer.writeUInt16LE(0, 6);                    // number of the disk with the     start of the central directory  2 bytes
@@ -208,6 +244,7 @@ Entry.prototype.setFileDataPumpFunction = function(doFileDataPump) {
   this.doFileDataPump = doFileDataPump;
   this.state = Entry.READY_TO_PUMP_FILE_DATA;
 };
+var LOCAL_FILE_HEADER_FIXED_SIZE = 30;
 // this version enables utf8 filename encoding
 var VERSION_NEEDED_TO_EXTRACT = 0x0014;
 // this is the "version made by" reported by linux info-zip.
@@ -215,7 +252,7 @@ var VERSION_MADE_BY_INFO_ZIP = 0x031e;
 var FILE_NAME_IS_UTF8 = 1 << 11;
 var UNKNOWN_CRC32_AND_FILE_SIZES = 1 << 3;
 Entry.prototype.getLocalFileHeader = function() {
-  var fixedSizeStuff = new Buffer(30);
+  var fixedSizeStuff = new Buffer(LOCAL_FILE_HEADER_FIXED_SIZE);
   var generalPurposeBitFlag = UNKNOWN_CRC32_AND_FILE_SIZES | FILE_NAME_IS_UTF8;
   fixedSizeStuff.writeUInt32LE(0x04034b50, 0);                  // local file header signature     4 bytes  (0x04034b50)
   fixedSizeStuff.writeUInt16LE(VERSION_NEEDED_TO_EXTRACT, 4);   // version needed to extract       2 bytes
@@ -234,15 +271,17 @@ Entry.prototype.getLocalFileHeader = function() {
     /* no extra fields */                                       // extra field (variable size)
   ]);
 };
+var FILE_DESCRIPTOR_SIZE = 12
 Entry.prototype.getFileDescriptor = function() {
-  var buffer = new Buffer(12);
+  var buffer = new Buffer(FILE_DESCRIPTOR_SIZE);
   buffer.writeUInt32LE(this.crc32, 0);            // crc-32                          4 bytes
   buffer.writeUInt32LE(this.compressedSize, 4);   // compressed size                 4 bytes
   buffer.writeUInt32LE(this.uncompressedSize, 8); // uncompressed size               4 bytes
   return buffer;
 }
+var CENTRAL_DIRECTORY_RECORD_FIXED_SIZE = 46;
 Entry.prototype.getCentralDirectoryRecord = function() {
-  var fixedSizeStuff = new Buffer(46);
+  var fixedSizeStuff = new Buffer(CENTRAL_DIRECTORY_RECORD_FIXED_SIZE);
   fixedSizeStuff.writeUInt32LE(0x02014b50, 0);                        // central file header signature   4 bytes  (0x02014b50)
   fixedSizeStuff.writeUInt16LE(VERSION_MADE_BY_INFO_ZIP, 4);          // version made by                 2 bytes
   fixedSizeStuff.writeUInt16LE(VERSION_NEEDED_TO_EXTRACT, 6);         // version needed to extract       2 bytes
