@@ -107,7 +107,7 @@ function pumpFileDataReadStream(self, entry, readStream) {
             .pipe(compressor)
             .pipe(compressedSizeCounter)
             .pipe(self.outputStream, {end: false});
-  compressedSizeCounter.on("finish", function() {
+  compressedSizeCounter.on("end", function() {
     entry.crc32 = crc32Watcher.crc32;
     if (entry.uncompressedSize == null) {
       entry.uncompressedSize = uncompressedSizeCounter.byteCount;
