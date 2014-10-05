@@ -271,14 +271,15 @@ Entry.prototype.getLocalFileHeader = function() {
     /* no extra fields */                                       // extra field (variable size)
   ]);
 };
-var FILE_DESCRIPTOR_SIZE = 12
+var FILE_DESCRIPTOR_SIZE = 16
 Entry.prototype.getFileDescriptor = function() {
   var buffer = new Buffer(FILE_DESCRIPTOR_SIZE);
-  buffer.writeUInt32LE(this.crc32, 0);            // crc-32                          4 bytes
-  buffer.writeUInt32LE(this.compressedSize, 4);   // compressed size                 4 bytes
-  buffer.writeUInt32LE(this.uncompressedSize, 8); // uncompressed size               4 bytes
+  buffer.writeUInt32LE(0x08074b50, 0);             // optional signature (required according to Archive Utility)
+  buffer.writeUInt32LE(this.crc32, 4);             // crc-32                          4 bytes
+  buffer.writeUInt32LE(this.compressedSize, 8);    // compressed size                 4 bytes
+  buffer.writeUInt32LE(this.uncompressedSize, 12); // uncompressed size               4 bytes
   return buffer;
-}
+};
 var CENTRAL_DIRECTORY_RECORD_FIXED_SIZE = 46;
 Entry.prototype.getCentralDirectoryRecord = function() {
   var fixedSizeStuff = new Buffer(CENTRAL_DIRECTORY_RECORD_FIXED_SIZE);

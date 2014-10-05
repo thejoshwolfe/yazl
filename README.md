@@ -194,6 +194,8 @@ File Descriptors are given after each file data with this information, as per th
 But remember a complete metadata listing is still always available in the central directory record,
 so if unzip implementations are relying on that, like they should,
 none of this paragraph will matter anyway.
+Even so, Mac's Archive Utility requires File Descriptors to include the optional signature,
+so yazl includes the optional file descriptor signature.
 
 All other bits are unset.
 
