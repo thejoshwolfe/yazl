@@ -11,7 +11,10 @@
     "url": "https://github.com/thejoshwolfe/yazl.git"
   },
   "keywords": [
-    "zip"
+    "zip",
+    "stream",
+    "archive",
+    "file"
   ],
   "author": "Josh Wolfe <thejoshwolfe@gmail.com>",
   "license": "MIT",
