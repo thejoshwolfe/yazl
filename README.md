@@ -1,6 +1,7 @@
 # yazl
 
-yet another zip library for node
+yet another zip library for node. For unzipping, see
+[yauzl](https://github.com/thejoshwolfe/yauzl).
 
 Design principles:
 
