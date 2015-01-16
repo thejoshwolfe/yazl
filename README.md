@@ -249,10 +249,8 @@ In order to create empty directories, use `addEmptyDirectory()`.
 
 ## Change History
 
- * 2.2.0
+ * 2.1.0
    * Added `addEmptyDirectory()`.
    * `options` is now optional for `addReadStream()` and `addBuffer()`.
- * 2.1.0
-   * Update `fd-slicer` dependency.
  * 2.0.0
    * Initial release.
