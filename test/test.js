@@ -55,3 +55,32 @@ var BufferList = require("bl");
     }));
   });
 })();
+
+(function() {
+  var zipfile = new yazl.ZipFile();
+  // all options parameters are optional
+  zipfile.addFile(__filename, "a.txt");
+  zipfile.addBuffer(new Buffer("buffer"), "b.txt");
+  zipfile.addReadStream(new BufferList().append("stream"), "c.txt");
+  zipfile.addEmptyDirectory("d/");
+  zipfile.addEmptyDirectory("e");
+  zipfile.end(function(finalSize) {
+    if (finalSize !== -1) throw new Error("finalSize should be unknown");
+    zipfile.outputStream.pipe(new BufferList(function(err, data) {
+      if (err) throw err;
+      yauzl.fromBuffer(data, function(err, zipfile) {
+        if (err) throw err;
+        var entryNames = ["a.txt", "b.txt", "c.txt", "d/", "e/"];
+        zipfile.on("entry", function(entry) {
+          var expectedName = entryNames.shift();
+          if (entry.fileName !== expectedName) {
+            throw new Error("unexpected entry fileName: " + entry.fileName + ", expected: " + expectedName);
+          }
+        });
+        zipfile.on("end", function() {
+          if (entryNames.length === 0) console.log("optional parameters and directories: pass");
+        });
+      });
+    }));
+  });
+})();

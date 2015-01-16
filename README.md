@@ -55,24 +55,25 @@ Typically `metadataPath` would be calculated as `path.relative(root, realPath)`.
 Unzip programs would extract the file from the zipfile as `metadataPath`.
 `realPath` is not stored in the zipfile.
 
-This function throws an error if `metadataPath` starts with `"/"` or `/[A-Za-z]:\//`
-or if it contains `".."` path segments or `"\\"`.
-These would be illegal file names according to the spec.
+A valid `metadataPath` must not be blank, must not start with `"/"` or `/[A-Za-z]:\//`,
+and must not contain `"\\"` or `".."` path segments.
+File paths must not end with `"/"`.
 
-`options` may be omitted or null has the following structure and default values:
+`options` may be omitted or null and has the following structure and default values:
 
 ```js
 {
-  mtime: stats.mtime, // optional
-  mode: stats.mode,   // optional
-  compress: true,     // optional
+  mtime: stats.mtime,
+  mode: stats.mode,
+  compress: true,
 }
 ```
 
 Use `options.mtime` and/or `options.mode` to override the values
 that would normally be obtained by the `fs.Stats` for the `realPath`.
-The mtime and mode (unix permission bits and file type) are stored in the zip file
-in the fields "last mod file time", "last mod file date", and "external file attributes".
+The mode is the unix permission bits and file type.
+The mtime and mode are stored in the zip file in the fields "last mod file time",
+"last mod file date", and "external file attributes".
 yazl does not store group and user ids in the zip file.
 
 Internally, `fs.stat()` is called immediately in the `addFile` function,
@@ -80,18 +81,18 @@ and `fs.createReadStream()` is used later when the file data is actually require
 Throughout adding and encoding `n` files with `addFile()`,
 the number of simultaneous open files is `O(1)`, probably just 1 at a time.
 
-#### addReadStream(readStream, metadataPath, options)
+#### addReadStream(readStream, metadataPath, [options])
 
 Adds a file to the zip file whose content is read from `readStream`.
 See `addFile()` for info about the `metadataPath` parameter.
-`options` is an `Object` and has the following structure:
+`options` may be omitted or null and has the following structure and default values:
 
 ```js
 {
-  mtime: new Date(), // required
-  mode: 0100664,     // required
-  compress: true,    // optional (default true)
-  size: 12345,       // optional
+  mtime: new Date(),
+  mode: 0100664,
+  compress: true,
+  size: 12345, // example value
 }
 ```
 
@@ -99,17 +100,37 @@ See `addFile()` for the meaning of `mtime` and `mode`.
 If `size` is given, it will be checked against the actual number of bytes in the `readStream`,
 and an error will be emitted if there is a mismatch.
 
-#### addBuffer(buffer, metadataPath, options)
+#### addBuffer(buffer, metadataPath, [options])
 
 Adds a file to the zip file whose content is `buffer`.
 See `addFile()` for info about the `metadataPath` parameter.
-`options` is an `Object` and has the following structure:
+`options` may be omitted or null and has the following structure and default values:
 
 ```js
 {
-  mtime: new Date(), // required
-  mode: 0100664,     // required
-  compress: true,    // optional (default true)
+  mtime: new Date(),
+  mode: 0100664,
+  compress: true,
+}
+```
+
+See `addFile()` for the meaning of `mtime` and `mode`.
+
+#### addEmptyDirectory(metadataPath, [options])
+
+Adds an entry to the zip file that indicates a directory should be created,
+even if no other items in the zip file are contained in the directory.
+This method is only required if the zip file is intended to contain an empty directory.
+
+See `addFile()` for info about the `metadataPath` parameter.
+If `metadataPath` does not end with a `"/"`, a `"/"` will be appended.
+
+`options` may be omitted or null and has the following structure and default values:
+
+```js
+{
+  mtime: new Date(),
+  mode: 040775,
 }
 ```
 
@@ -212,11 +233,26 @@ and is probably not significant in any modern unzip implementation.
 Always `stats.mode << 16`.
 This is apparently the convention for "version made by" = `0x03xx` (UNIX).
 
+Note that for directory entries (see `addEmptyDirectory()`),
+it is conventional to use the lower 8 bits for the MS-DOS directory attribute byte.
+However, the spec says this is only required if the Version Made By is DOS,
+so this library does not do that.
+
 ### Directory Entries
 
-yazl does not record directories themselves as separate entries in the zipfile metadata.
-Instead, file entries with paths (such as "directory/file.txt") imply the need for their parent directories.
-Unzip clients seems to respect this style of pathing,
+When adding a `metadataPath` such as `"parent/file.txt"`, yazl does not add a directory entry for `"parent/"`,
+because file entries imply the need for their parent directories.
+Unzip clients seem to respect this style of pathing,
 and the zip file spec does not specify what is standard in this regard.
 
-Directory entries would be required to archive empty directories (see issue #4).
+In order to create empty directories, use `addEmptyDirectory()`.
+
+## Change History
+
+ * 2.2.0
+   * Added `addEmptyDirectory()`.
+   * `options` is now optional for `addReadStream()` and `addBuffer()`.
+ * 2.1.0
+   * Update `fd-slicer` dependency.
+ * 2.0.0
+   * Initial release.

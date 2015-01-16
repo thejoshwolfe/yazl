@@ -18,7 +18,15 @@ args.forEach(function(arg) {
   } else if (/--no-compress/.test(arg)) {
     options.compress = false;
   } else {
-    zipfile.addFile(arg, arg, options);
+    // file thing
+    var stats = fs.statSync(arg);
+    if (stats.isFile()) {
+      zipfile.addFile(arg, arg, options);
+    } else if (stats.isDirectory()) {
+      zipfile.addEmptyDirectory(arg);
+    } else {
+      throw new Error("what is this: " + arg);
+    }
   }
 });
 zipfile.end();

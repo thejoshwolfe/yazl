@@ -19,17 +19,17 @@ function ZipFile() {
 
 ZipFile.prototype.addFile = function(realPath, metadataPath, options) {
   var self = this;
-  validateMetadataPath(metadataPath);
+  metadataPath = validateMetadataPath(metadataPath, false);
   if (options == null) options = {};
 
-  var entry = new Entry(metadataPath, options);
+  var entry = new Entry(metadataPath, false, options);
   self.entries.push(entry);
   fs.stat(realPath, function(err, stats) {
     if (err) return self.emit("error", err);
     if (!stats.isFile()) return self.emit("error", new Error("not a file: " + realPath));
     entry.uncompressedSize = stats.size;
-    if (entry.lastModFileTime == null || entry.lastModFileDate == null) entry.setLastModDate(stats.mtime);
-    if (entry.externalFileAttributes == null) entry.setFileAttributesMode(stats.mode);
+    if (options.mtime == null) entry.setLastModDate(stats.mtime);
+    if (options.mode == null) entry.setFileAttributesMode(stats.mode);
     entry.setFileDataPumpFunction(function() {
       var readStream = fs.createReadStream(realPath);
       entry.state = Entry.FILE_DATA_IN_PROGRESS;
@@ -44,10 +44,9 @@ ZipFile.prototype.addFile = function(realPath, metadataPath, options) {
 
 ZipFile.prototype.addReadStream = function(readStream, metadataPath, options) {
   var self = this;
-  validateMetadataPath(metadataPath);
+  metadataPath = validateMetadataPath(metadataPath, false);
   if (options == null) options = {};
-  var entry = new Entry(metadataPath, options);
-  validateFilelessEntryProperties(entry);
+  var entry = new Entry(metadataPath, false, options);
   self.entries.push(entry);
   entry.setFileDataPumpFunction(function() {
     entry.state = Entry.FILE_DATA_IN_PROGRESS;
@@ -59,10 +58,10 @@ ZipFile.prototype.addReadStream = function(readStream, metadataPath, options) {
 
 ZipFile.prototype.addBuffer = function(buffer, metadataPath, options) {
   var self = this;
-  validateMetadataPath(metadataPath);
+  metadataPath = validateMetadataPath(metadataPath, false);
   if (options == null) options = {};
-  var entry = new Entry(metadataPath, options);
-  validateFilelessEntryProperties(entry, buffer.length);
+  if (options.size != null) throw new Error("options.size not allowed");
+  var entry = new Entry(metadataPath, false, options);
   entry.uncompressedSize = buffer.length;
   entry.crc32 = crc32.unsigned(buffer);
   self.entries.push(entry);
@@ -83,6 +82,22 @@ ZipFile.prototype.addBuffer = function(buffer, metadataPath, options) {
     });
     pumpEntries(self);
   }
+};
+
+ZipFile.prototype.addEmptyDirectory = function(metadataPath, options) {
+  var self = this;
+  metadataPath = validateMetadataPath(metadataPath, true);
+  if (options == null) options = {};
+  if (options.size != null) throw new Error("options.size not allowed");
+  if (options.compress != null) throw new Error("options.compress not allowed");
+  var entry = new Entry(metadataPath, true, options);
+  self.entries.push(entry);
+  entry.setFileDataPumpFunction(function() {
+    writeToOutputStream(self, entry.getFileDescriptor());
+    entry.state = Entry.FILE_DATA_DONE;
+    pumpEntries(self);
+  });
+  pumpEntries(self);
 };
 
 ZipFile.prototype.end = function(finalSizeCallback) {
@@ -203,28 +218,47 @@ function getEndOfCentralDirectoryRecord(self) {
   return buffer;
 }
 
-function validateMetadataPath(metadataPath) {
+function validateMetadataPath(metadataPath, isDirectory) {
+  if (metadataPath === "") throw new Erorr("empty metadataPath");
   if (metadataPath.indexOf("\\") !== -1) throw new Error("invalid characters in path: " + metadataPath);
   if (/^[a-zA-Z]:/.test(metadataPath) || /^\//.test(metadataPath)) throw new Error("absolute path: " + metadataPath);
   if (metadataPath.split("/").indexOf("..") !== -1) throw new Error("invalid relative path: " + metadataPath);
-}
-function validateFilelessEntryProperties(entry, length) {
-  if (entry.lastModFileTime == null || entry.lastModFileDate == null) throw new Error("missing options.mtime");
-  if (entry.externalFileAttributes == null) throw new Error("missing options.mode");
-  if (entry.uncompressedSize != null && length != null && entry.uncompressedSize !== length) throw new Error("invalid options.size");
+  var looksLikeDirectory = /\/$/.test(metadataPath);
+  if (isDirectory) {
+    // append a trailing '/' if necessary.
+    if (!looksLikeDirectory) metadataPath += "/";
+  } else {
+    if (looksLikeDirectory) throw new Error("file path cannot end with '/': " + metadataPath);
+  }
+  return metadataPath;
 }
 
 // this class is not part of the public API
-function Entry(metadataPath, options) {
+function Entry(metadataPath, isDirectory, options) {
   this.utf8FileName = new Buffer(metadataPath);
   if (this.utf8FileName.length > 0xffff) throw new Error("utf8 file name too long. " + utf8FileName.length + " > " + 0xffff);
+  this.isDirectory = isDirectory;
   this.state = Entry.WAITING_FOR_METADATA;
-  if (options.mtime != null) this.setLastModDate(options.mtime);
-  if (options.mode != null) this.setFileAttributesMode(options.mode);
-  this.uncompressedSize = null; // unknown
-  if (options.size != null) this.uncompressedSize = options.size;
-  this.compress = true; // default
-  if (options.compress != null) this.compress = !!options.compress;
+  this.setLastModDate(options.mtime != null ? options.mtime : new Date());
+  if (options.mode != null) {
+    this.setFileAttributesMode(options.mode);
+  } else {
+    this.setFileAttributesMode(isDirectory ? 040775 : 0100664);
+  }
+  if (isDirectory) {
+    this.crc32 = 0;
+    this.uncompressedSize = 0;
+    this.compressedSize = 0;
+  } else {
+    this.uncompressedSize = null; // unknown
+    if (options.size != null) this.uncompressedSize = options.size;
+  }
+  if (isDirectory) {
+    this.compress = false;
+  } else {
+    this.compress = true; // default
+    if (options.compress != null) this.compress = !!options.compress;
+  }
 }
 Entry.WAITING_FOR_METADATA = 0;
 Entry.READY_TO_PUMP_FILE_DATA = 1;
