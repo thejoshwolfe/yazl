@@ -100,6 +100,9 @@ See `addFile()` for the meaning of `mtime` and `mode`.
 If `size` is given, it will be checked against the actual number of bytes in the `readStream`,
 and an error will be emitted if there is a mismatch.
 
+Note that yazl will `.pipe()` data from `readStream`, so be careful using `.on('data')`.
+In certain versions of node, `.on('data')` makes `.pipe()` behave incorrectly.
+
 #### addBuffer(buffer, metadataPath, [options])
 
 Adds a file to the zip file whose content is `buffer`.
@@ -168,6 +171,9 @@ which means throttling happens appropriately when this stream is piped to a slow
 Data becomes available in this stream soon after calling one of `addFile()`, `addReadStream()`, or `addBuffer()`.
 Clients can call `pipe()` on this stream at any time,
 such as immediately after getting a new `ZipFile` instance, or long after calling `end()`.
+
+As a reminder, be careful using both `.on('data')` and `.pipe()` with this stream.
+In certain versions of node, you cannot use both `.on('data')` and `.pipe()` successfully.
 
 ### dateToDosDateTime(jsDate)
 
