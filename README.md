@@ -255,6 +255,8 @@ In order to create empty directories, use `addEmptyDirectory()`.
 
 ## Change History
 
+ * 2.1.1
+   * Fixed stack overflow when using addBuffer() in certain ways. [issue #9](https://github.com/thejoshwolfe/yazl/issues/9)
  * 2.1.0
    * Added `addEmptyDirectory()`.
    * `options` is now optional for `addReadStream()` and `addBuffer()`.
