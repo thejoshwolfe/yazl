@@ -51,7 +51,6 @@ ZipFile.prototype.addReadStream = function(readStream, metadataPath, options) {
   entry.setFileDataPumpFunction(function() {
     entry.state = Entry.FILE_DATA_IN_PROGRESS;
     pumpFileDataReadStream(self, entry, readStream);
-    pumpEntries(self);
   });
   pumpEntries(self);
 };
@@ -78,7 +77,12 @@ ZipFile.prototype.addBuffer = function(buffer, metadataPath, options) {
       writeToOutputStream(self, compressedBuffer);
       writeToOutputStream(self, entry.getFileDescriptor());
       entry.state = Entry.FILE_DATA_DONE;
-      pumpEntries(self);
+
+      // don't call pumpEntries() recursively.
+      // (also, don't call process.nextTick recursively.)
+      setImmediate(function() {
+        pumpEntries(self);
+      });
     });
     pumpEntries(self);
   }
@@ -274,6 +278,7 @@ Entry.prototype.setFileAttributesMode = function(mode) {
   // http://unix.stackexchange.com/questions/14705/the-zip-formats-external-file-attribute/14727#14727
   this.externalFileAttributes = (mode << 16) >>> 0;
 };
+// doFileDataPump() should not call pumpEntries() directly. see issue #9.
 Entry.prototype.setFileDataPumpFunction = function(doFileDataPump) {
   this.doFileDataPump = doFileDataPump;
   this.state = Entry.READY_TO_PUMP_FILE_DATA;
