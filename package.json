@@ -1,6 +1,6 @@
 {
   "name": "yazl",
-  "version": "2.1.1",
+  "version": "2.1.2",
   "description": "yet another zip library for node",
   "main": "index.js",
   "scripts": {
