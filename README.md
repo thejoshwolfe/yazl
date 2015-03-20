@@ -255,6 +255,8 @@ In order to create empty directories, use `addEmptyDirectory()`.
 
 ## Change History
 
+ * 2.1.3
+   * Fix bug when only addBuffer() and end() are called. [issue #12](https://github.com/thejoshwolfe/yazl/issues/12)
  * 2.1.2
    * Fixed typo in parameter validation. [pull request #10](https://github.com/thejoshwolfe/yazl/pull/10)
  * 2.1.1
