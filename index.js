@@ -14,7 +14,8 @@ function ZipFile() {
   this.outputStream = new PassThrough();
   this.entries = [];
   this.outputStreamCursor = 0;
-  this.ended = false;
+  this.ended = false; // .end() sets this
+  this.allDone = false; // set when we've written the last bytes
 }
 
 ZipFile.prototype.addFile = function(realPath, metadataPath, options) {
@@ -142,6 +143,7 @@ function pumpFileDataReadStream(self, entry, readStream) {
 }
 
 function pumpEntries(self) {
+  if (self.allDone) return;
   // first check if finalSize is finally known
   if (self.ended && self.finalSizeCallback != null) {
     var finalSize = calculateFinalSize(self);
@@ -181,6 +183,7 @@ function pumpEntries(self) {
       });
       writeToOutputStream(self, getEndOfCentralDirectoryRecord(self));
       self.outputStream.end();
+      self.allDone = true;
     }
   }
 }
