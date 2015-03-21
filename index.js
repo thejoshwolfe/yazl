@@ -257,7 +257,10 @@ function Entry(metadataPath, isDirectory, options) {
     this.uncompressedSize = 0;
     this.compressedSize = 0;
   } else {
-    this.uncompressedSize = null; // unknown
+    // unknown
+    this.crc32 = null;
+    this.uncompressedSize = null;
+    this.compressedSize = null;
     if (options.size != null) this.uncompressedSize = options.size;
   }
   if (isDirectory) {
@@ -294,17 +297,31 @@ var VERSION_MADE_BY_INFO_ZIP = 0x031e;
 var FILE_NAME_IS_UTF8 = 1 << 11;
 var UNKNOWN_CRC32_AND_FILE_SIZES = 1 << 3;
 Entry.prototype.getLocalFileHeader = function() {
+  var crcAndFileSizeKnown = this.crc32 != null &&
+                            this.uncompressedSize != null &&
+                            this.compressedSize != null;
+  var crc32 = 0;
+  var compressedSize = 0;
+  var uncompressedSize = 0;
+  if (crcAndFileSizeKnown) {
+    crc32 = this.crc32;
+    compressedSize = this.compressedSize;
+    uncompressedSize = this.uncompressedSize;
+  }
+
   var fixedSizeStuff = new Buffer(LOCAL_FILE_HEADER_FIXED_SIZE);
-  var generalPurposeBitFlag = UNKNOWN_CRC32_AND_FILE_SIZES | FILE_NAME_IS_UTF8;
+  var generalPurposeBitFlag = FILE_NAME_IS_UTF8;
+  if (!crcAndFileSizeKnown) generalPurposeBitFlag |= UNKNOWN_CRC32_AND_FILE_SIZES;
+
   fixedSizeStuff.writeUInt32LE(0x04034b50, 0);                  // local file header signature     4 bytes  (0x04034b50)
   fixedSizeStuff.writeUInt16LE(VERSION_NEEDED_TO_EXTRACT, 4);   // version needed to extract       2 bytes
   fixedSizeStuff.writeUInt16LE(generalPurposeBitFlag, 6);       // general purpose bit flag        2 bytes
   fixedSizeStuff.writeUInt16LE(this.getCompressionMethod(), 8); // compression method              2 bytes
   fixedSizeStuff.writeUInt16LE(this.lastModFileTime, 10);       // last mod file time              2 bytes
   fixedSizeStuff.writeUInt16LE(this.lastModFileDate, 12);       // last mod file date              2 bytes
-  fixedSizeStuff.writeUInt32LE(0, 14);                          // crc-32                          4 bytes
-  fixedSizeStuff.writeUInt32LE(0, 18);                          // compressed size                 4 bytes
-  fixedSizeStuff.writeUInt32LE(0, 22);                          // uncompressed size               4 bytes
+  fixedSizeStuff.writeUInt32LE(crc32, 14);                      // crc-32                          4 bytes
+  fixedSizeStuff.writeUInt32LE(compressedSize, 18);             // compressed size                 4 bytes
+  fixedSizeStuff.writeUInt32LE(uncompressedSize, 22);           // uncompressed size               4 bytes
   fixedSizeStuff.writeUInt16LE(this.utf8FileName.length, 26);   // file name length                2 bytes
   fixedSizeStuff.writeUInt16LE(0, 28);                          // extra field length              2 bytes
   return Buffer.concat([
