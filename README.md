@@ -119,6 +119,15 @@ See `addFile()` for info about the `metadataPath` parameter.
 
 See `addFile()` for the meaning of `mtime` and `mode`.
 
+This method has the unique property that General Purpose Bit `3` will not be used in the Local File Header.
+This doesn't matter for unzip implementations that conform to the Zip File Spec.
+However, 7-Zip 9.20 has a known bug where General Purpose Bit `3` is declared an unsupported compression method
+(note that it really has nothing to do with the compression method.).
+See [issue #12](https://github.com/thejoshwolfe/yazl/issues/12).
+If you would like to create zip files that 7-Zip 9.20 can understand,
+you must use `addBuffer()` instead of `addFile()` or `addReadStream()` for all entries in the zip file
+(and `addEmptyDirectory()` is fine too).
+
 #### addEmptyDirectory(metadataPath, [options])
 
 Adds an entry to the zip file that indicates a directory should be created,
@@ -215,15 +224,19 @@ refuse to acknowledge General Purpose Bit `8`, which enables utf8 filename encod
 Bit `8` is always set.
 Filenames are always encoded in utf8, even if the result is indistinguishable from ascii.
 
-Bit `3` is set in the Local File Header.
+Bit `3` is usually set in the Local File Header.
 To support both a streaming input and streaming output api,
 it is impossible to know the crc32 before processing the file data.
 File Descriptors are given after each file data with this information, as per the spec.
 But remember a complete metadata listing is still always available in the central directory record,
 so if unzip implementations are relying on that, like they should,
 none of this paragraph will matter anyway.
-Even so, Mac's Archive Utility requires File Descriptors to include the optional signature,
+Even so, some popular unzip implementations do not follow the spec.
+Mac's Archive Utility requires File Descriptors to include the optional signature,
 so yazl includes the optional file descriptor signature.
+Additionally, 7-Zip 9.20 does not seem to support general purpose bit `3` at all
+(it declares it an unsupported compression method, which is just wrong.
+See [issue #12](https://github.com/thejoshwolfe/yazl/issues/12)).
 
 All other bits are unset.
 
@@ -255,6 +268,8 @@ In order to create empty directories, use `addEmptyDirectory()`.
 
 ## Change History
 
+ * 2.2.0
+   * Avoid using general purpose bit 3 for `addBuffer()` calls. [issue #13](https://github.com/thejoshwolfe/yazl/issues/13)
  * 2.1.3
    * Fix bug when only addBuffer() and end() are called. [issue #12](https://github.com/thejoshwolfe/yazl/issues/12)
  * 2.1.2
