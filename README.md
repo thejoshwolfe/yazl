@@ -123,7 +123,7 @@ This method has the unique property that General Purpose Bit `3` will not be use
 This doesn't matter for unzip implementations that conform to the Zip File Spec.
 However, 7-Zip 9.20 has a known bug where General Purpose Bit `3` is declared an unsupported compression method
 (note that it really has nothing to do with the compression method.).
-See [issue #12](https://github.com/thejoshwolfe/yazl/issues/12).
+See [issue #11](https://github.com/thejoshwolfe/yazl/issues/11).
 If you would like to create zip files that 7-Zip 9.20 can understand,
 you must use `addBuffer()` instead of `addFile()` or `addReadStream()` for all entries in the zip file
 (and `addEmptyDirectory()` is fine too).
@@ -236,7 +236,7 @@ Mac's Archive Utility requires File Descriptors to include the optional signatur
 so yazl includes the optional file descriptor signature.
 Additionally, 7-Zip 9.20 does not seem to support general purpose bit `3` at all
 (it declares it an unsupported compression method, which is just wrong.
-See [issue #12](https://github.com/thejoshwolfe/yazl/issues/12)).
+See [issue #11](https://github.com/thejoshwolfe/yazl/issues/11)).
 
 All other bits are unset.
 
