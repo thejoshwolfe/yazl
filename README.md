@@ -227,16 +227,16 @@ Filenames are always encoded in utf8, even if the result is indistinguishable fr
 Bit `3` is usually set in the Local File Header.
 To support both a streaming input and streaming output api,
 it is impossible to know the crc32 before processing the file data.
-File Descriptors are given after each file data with this information, as per the spec.
+When bit `3` is set, file Descriptors are given after each file data with this information, as per the spec.
 But remember a complete metadata listing is still always available in the central directory record,
 so if unzip implementations are relying on that, like they should,
 none of this paragraph will matter anyway.
 Even so, some popular unzip implementations do not follow the spec.
 Mac's Archive Utility requires File Descriptors to include the optional signature,
 so yazl includes the optional file descriptor signature.
-Additionally, 7-Zip 9.20 does not seem to support general purpose bit `3` at all
-(it declares it an unsupported compression method, which is just wrong.
-See [issue #11](https://github.com/thejoshwolfe/yazl/issues/11)).
+When bit `3` is not used, Mac's Archive Utility requires there to be no file descriptor, so yazl skips it in that case.
+Additionally, 7-Zip 9.20 does not seem to support bit `3` at all
+(see [issue #11](https://github.com/thejoshwolfe/yazl/issues/11)).
 
 All other bits are unset.
 

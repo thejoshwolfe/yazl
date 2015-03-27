@@ -64,6 +64,7 @@ ZipFile.prototype.addBuffer = function(buffer, metadataPath, options) {
   var entry = new Entry(metadataPath, false, options);
   entry.uncompressedSize = buffer.length;
   entry.crc32 = crc32.unsigned(buffer);
+  entry.crcAndFileSizeKnown = true;
   self.entries.push(entry);
   if (!entry.compress) {
     setCompressedBuffer(buffer);
@@ -203,8 +204,8 @@ function calculateFinalSize(self) {
     }
     result += LOCAL_FILE_HEADER_FIXED_SIZE + entry.utf8FileName.length +
               entry.uncompressedSize +
-              FILE_DESCRIPTOR_SIZE +
               CENTRAL_DIRECTORY_RECORD_FIXED_SIZE + entry.utf8FileName.length;
+    if (!entry.crcAndFileSizeKnown) result += FILE_DESCRIPTOR_SIZE;
   }
   result += END_OF_CENTRAL_DIRECTORY_RECORD_SIZE;
   return result;
@@ -253,11 +254,13 @@ function Entry(metadataPath, isDirectory, options) {
     this.setFileAttributesMode(isDirectory ? 040775 : 0100664);
   }
   if (isDirectory) {
+    this.crcAndFileSizeKnown = true;
     this.crc32 = 0;
     this.uncompressedSize = 0;
     this.compressedSize = 0;
   } else {
-    // unknown
+    // unknown so far
+    this.crcAndFileSizeKnown = false;
     this.crc32 = null;
     this.uncompressedSize = null;
     this.compressedSize = null;
@@ -297,13 +300,10 @@ var VERSION_MADE_BY_INFO_ZIP = 0x031e;
 var FILE_NAME_IS_UTF8 = 1 << 11;
 var UNKNOWN_CRC32_AND_FILE_SIZES = 1 << 3;
 Entry.prototype.getLocalFileHeader = function() {
-  var crcAndFileSizeKnown = this.crc32 != null &&
-                            this.uncompressedSize != null &&
-                            this.compressedSize != null;
   var crc32 = 0;
   var compressedSize = 0;
   var uncompressedSize = 0;
-  if (crcAndFileSizeKnown) {
+  if (this.crcAndFileSizeKnown) {
     crc32 = this.crc32;
     compressedSize = this.compressedSize;
     uncompressedSize = this.uncompressedSize;
@@ -311,7 +311,7 @@ Entry.prototype.getLocalFileHeader = function() {
 
   var fixedSizeStuff = new Buffer(LOCAL_FILE_HEADER_FIXED_SIZE);
   var generalPurposeBitFlag = FILE_NAME_IS_UTF8;
-  if (!crcAndFileSizeKnown) generalPurposeBitFlag |= UNKNOWN_CRC32_AND_FILE_SIZES;
+  if (!this.crcAndFileSizeKnown) generalPurposeBitFlag |= UNKNOWN_CRC32_AND_FILE_SIZES;
 
   fixedSizeStuff.writeUInt32LE(0x04034b50, 0);                  // local file header signature     4 bytes  (0x04034b50)
   fixedSizeStuff.writeUInt16LE(VERSION_NEEDED_TO_EXTRACT, 4);   // version needed to extract       2 bytes
@@ -332,6 +332,10 @@ Entry.prototype.getLocalFileHeader = function() {
 };
 var FILE_DESCRIPTOR_SIZE = 16
 Entry.prototype.getFileDescriptor = function() {
+  if (this.crcAndFileSizeKnown) {
+    // MAC's Archive Utility requires this not be present unless we set general purpose bit 3
+    return new Buffer(0);
+  }
   var buffer = new Buffer(FILE_DESCRIPTOR_SIZE);
   buffer.writeUInt32LE(0x08074b50, 0);             // optional signature (required according to Archive Utility)
   buffer.writeUInt32LE(this.crc32, 4);             // crc-32                          4 bytes

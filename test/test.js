@@ -84,3 +84,29 @@ var BufferList = require("bl");
     }));
   });
 })();
+
+(function() {
+  var zipfile = new yazl.ZipFile();
+  // all options parameters are optional
+  zipfile.addBuffer(new Buffer("hello"), "hello.txt", {compress: false});
+  zipfile.end(function(finalSize) {
+    if (finalSize === -1) throw new Error("finalSize should be known");
+    zipfile.outputStream.pipe(new BufferList(function(err, data) {
+      if (err) throw err;
+      if (data.length !== finalSize) throw new Error("finalSize prediction is wrong. " + finalSize + " !== " + data.length);
+      yauzl.fromBuffer(data, function(err, zipfile) {
+        if (err) throw err;
+        var entryNames = ["hello.txt"];
+        zipfile.on("entry", function(entry) {
+          var expectedName = entryNames.shift();
+          if (entry.fileName !== expectedName) {
+            throw new Error("unexpected entry fileName: " + entry.fileName + ", expected: " + expectedName);
+          }
+        });
+        zipfile.on("end", function() {
+          if (entryNames.length === 0) console.log("justAddBuffer: pass");
+        });
+      });
+    }));
+  });
+})();
