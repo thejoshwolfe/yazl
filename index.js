@@ -133,7 +133,8 @@ function pumpFileDataReadStream(self, entry, readStream) {
     if (entry.uncompressedSize == null) {
       entry.uncompressedSize = uncompressedSizeCounter.byteCount;
     } else {
-      if (entry.uncompressedSize !== uncompressedSizeCounter.byteCount) return self.emit("error", new Error("file data stream has unexpected number of bytes"));
+      if (entry.uncompressedSize !== uncompressedSizeCounter.byteCount) 
+      { console.log("WARNING: Large file '" + entry.utf8FileName.toString() + "' may cause issues."); entry.uncompressedSize = uncompressedSizeCounter.byteCount; }
     }
     entry.compressedSize = compressedSizeCounter.byteCount;
     self.outputStreamCursor += entry.compressedSize;
