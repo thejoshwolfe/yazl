@@ -268,6 +268,10 @@ In order to create empty directories, use `addEmptyDirectory()`.
 
 ## Change History
 
+ * 2.2.2
+   * Fix 7-Zip compatibility issue. [pull request #17](https://github.com/thejoshwolfe/yazl/pull/17)
+ * 2.2.1
+   * Fix Mac Archive Utility compatibility issue. [issue #14](https://github.com/thejoshwolfe/yazl/issues/14)
  * 2.2.0
    * Avoid using general purpose bit 3 for `addBuffer()` calls. [issue #13](https://github.com/thejoshwolfe/yazl/issues/13)
  * 2.1.3
