@@ -346,10 +346,13 @@ Entry.prototype.getFileDescriptor = function() {
 var CENTRAL_DIRECTORY_RECORD_FIXED_SIZE = 46;
 Entry.prototype.getCentralDirectoryRecord = function() {
   var fixedSizeStuff = new Buffer(CENTRAL_DIRECTORY_RECORD_FIXED_SIZE);
+  var generalPurposeBitFlag = FILE_NAME_IS_UTF8;
+  if (!this.crcAndFileSizeKnown) generalPurposeBitFlag |= UNKNOWN_CRC32_AND_FILE_SIZES;
+  
   fixedSizeStuff.writeUInt32LE(0x02014b50, 0);                        // central file header signature   4 bytes  (0x02014b50)
   fixedSizeStuff.writeUInt16LE(VERSION_MADE_BY_INFO_ZIP, 4);          // version made by                 2 bytes
   fixedSizeStuff.writeUInt16LE(VERSION_NEEDED_TO_EXTRACT, 6);         // version needed to extract       2 bytes
-  fixedSizeStuff.writeUInt16LE(FILE_NAME_IS_UTF8, 8);                 // general purpose bit flag        2 bytes
+  fixedSizeStuff.writeUInt16LE(generalPurposeBitFlag, 8);             // general purpose bit flag        2 bytes
   fixedSizeStuff.writeUInt16LE(this.getCompressionMethod(), 10);      // compression method              2 bytes
   fixedSizeStuff.writeUInt16LE(this.lastModFileTime, 12);             // last mod file time              2 bytes
   fixedSizeStuff.writeUInt16LE(this.lastModFileDate, 14);             // last mod file date              2 bytes
