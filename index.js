@@ -1,4 +1,5 @@
 var fs = require("fs");
+var path = require("path");
 var Transform = require("stream").Transform;
 var PassThrough = require("stream").PassThrough;
 var zlib = require("zlib");
@@ -228,7 +229,6 @@ function getEndOfCentralDirectoryRecord(self) {
 
 function validateMetadataPath(metadataPath, isDirectory) {
   if (metadataPath === "") throw new Error("empty metadataPath");
-  if (metadataPath.indexOf("\\") !== -1) throw new Error("invalid characters in path: " + metadataPath);
   if (/^[a-zA-Z]:/.test(metadataPath) || /^\//.test(metadataPath)) throw new Error("absolute path: " + metadataPath);
   if (metadataPath.split("/").indexOf("..") !== -1) throw new Error("invalid relative path: " + metadataPath);
   var looksLikeDirectory = /\/$/.test(metadataPath);
@@ -238,7 +238,7 @@ function validateMetadataPath(metadataPath, isDirectory) {
   } else {
     if (looksLikeDirectory) throw new Error("file path cannot end with '/': " + metadataPath);
   }
-  return metadataPath;
+  return path.normalize(metadataPath).replace(/\\/g,"/");
 }
 
 // this class is not part of the public API
