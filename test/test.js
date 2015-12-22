@@ -14,6 +14,7 @@ var BufferList = require("bl");
   zipfile.addReadStream(fs.createReadStream(__filename), "readStream.txt", fileMetadata);
   var expectedContents = fs.readFileSync(__filename);
   zipfile.addBuffer(expectedContents, "with/directories.txt", fileMetadata);
+  zipfile.addBuffer(expectedContents, "with\\windows-paths.txt", fileMetadata);
   zipfile.end(function(finalSize) {
     if (finalSize !== -1) throw new Error("finalSize is impossible to know before compression");
     zipfile.outputStream.pipe(new BufferList(function(err, data) {

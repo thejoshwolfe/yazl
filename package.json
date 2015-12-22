@@ -27,6 +27,6 @@
   },
   "devDependencies": {
     "bl": "~0.9.3",
-    "yauzl": "~2.0.0"
+    "yauzl": "~2.3.1"
   }
 }
