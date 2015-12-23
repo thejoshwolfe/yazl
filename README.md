@@ -55,8 +55,10 @@ Typically `metadataPath` would be calculated as `path.relative(root, realPath)`.
 Unzip programs would extract the file from the zipfile as `metadataPath`.
 `realPath` is not stored in the zipfile.
 
-A valid `metadataPath` must not be blank, must not start with `"/"` or `/[A-Za-z]:\//`,
-and must not contain `"\\"` or `".."` path segments.
+A valid `metadataPath` must not be blank.
+If a `metadataPath` contains `"\\"` characters, they will be replaced by `"/"` characters.
+After this substitution, a valid `metadataPath` must not start with `"/"` or `/[A-Za-z]:\//`,
+and must not contain `".."` path segments.
 File paths must not end with `"/"`.
 
 `options` may be omitted or null and has the following structure and default values:
@@ -268,6 +270,8 @@ In order to create empty directories, use `addEmptyDirectory()`.
 
 ## Change History
 
+ * 2.3.0
+   * `metadataPath` can have `\` characters now; they will be replaced with `/`. [issue #18](https://github.com/thejoshwolfe/yazl/issues/18)
  * 2.2.2
    * Fix 7-Zip compatibility issue. [pull request #17](https://github.com/thejoshwolfe/yazl/pull/17)
  * 2.2.1
