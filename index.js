@@ -16,6 +16,7 @@ function ZipFile() {
   this.outputStreamCursor = 0;
   this.ended = false; // .end() sets this
   this.allDone = false; // set when we've written the last bytes
+  this.forceZip64Format = false;
 }
 
 ZipFile.prototype.addFile = function(realPath, metadataPath, options) {
@@ -106,10 +107,16 @@ ZipFile.prototype.addEmptyDirectory = function(metadataPath, options) {
   pumpEntries(self);
 };
 
-ZipFile.prototype.end = function(finalSizeCallback) {
+ZipFile.prototype.end = function(options, finalSizeCallback) {
+  if (typeof options === "function") {
+    finalSizeCallback = options;
+    options = null;
+  }
+  if (options == null) options = {};
   if (this.ended) return;
   this.ended = true;
   this.finalSizeCallback = finalSizeCallback;
+  this.forceZip64Format = !!options.forceZip64Format;
   pumpEntries(this);
 };
 
@@ -272,6 +279,7 @@ function Entry(metadataPath, isDirectory, options) {
     this.compress = true; // default
     if (options.compress != null) this.compress = !!options.compress;
   }
+  this.forceZip64Format = !!options.forceZip64Format;
 }
 Entry.WAITING_FOR_METADATA = 0;
 Entry.READY_TO_PUMP_FILE_DATA = 1;

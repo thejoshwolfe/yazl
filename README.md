@@ -68,15 +68,23 @@ File paths must not end with `"/"`.
   mtime: stats.mtime,
   mode: stats.mode,
   compress: true,
+  forceZip64Format: false,
 }
 ```
 
-Use `options.mtime` and/or `options.mode` to override the values
+Use `mtime` and/or `mode` to override the values
 that would normally be obtained by the `fs.Stats` for the `realPath`.
 The mode is the unix permission bits and file type.
 The mtime and mode are stored in the zip file in the fields "last mod file time",
 "last mod file date", and "external file attributes".
 yazl does not store group and user ids in the zip file.
+
+If `compress` is `true`, the file data will be deflated (compression method 8).
+If `compress` is `false`, the file data will be stored (compression method 0).
+
+If `forceZip64Format` is `true`, yazl will use some of the ZIP64 format for this entry
+regardless of whether it is actually required.
+This option really only exists for the purpose of easy testing of ZIP64 support.
 
 Internally, `fs.stat()` is called immediately in the `addFile` function,
 and `fs.createReadStream()` is used later when the file data is actually required.
@@ -94,11 +102,12 @@ See `addFile()` for info about the `metadataPath` parameter.
   mtime: new Date(),
   mode: 0100664,
   compress: true,
+  forceZip64Format: false,
   size: 12345, // example value
 }
 ```
 
-See `addFile()` for the meaning of `mtime` and `mode`.
+See `addFile()` for the meaning of `mtime`, `mode`, `compress`, and `forceZip64Format`.
 If `size` is given, it will be checked against the actual number of bytes in the `readStream`,
 and an error will be emitted if there is a mismatch.
 
@@ -116,10 +125,11 @@ See `addFile()` for info about the `metadataPath` parameter.
   mtime: new Date(),
   mode: 0100664,
   compress: true,
+  forceZip64Format: false,
 }
 ```
 
-See `addFile()` for the meaning of `mtime` and `mode`.
+See `addFile()` for the meaning of `mtime`, `mode`, `compress`, and `forceZip64Format`.
 
 This method has the unique property that General Purpose Bit `3` will not be used in the Local File Header.
 This doesn't matter for unzip implementations that conform to the Zip File Spec.
@@ -150,12 +160,23 @@ If `metadataPath` does not end with a `"/"`, a `"/"` will be appended.
 
 See `addFile()` for the meaning of `mtime` and `mode`.
 
-#### end([finalSizeCallback])
+#### end([options], [finalSizeCallback])
 
 Indicates that no more files will be added via `addFile()`, `addReadStream()`, or `addBuffer()`.
 Some time after calling this function, `outputStream` will be ended. Note that this entails that you cannot rely on this
 callback to know when you are done producing output. If for instance you are creating a zip archive on disk, you will need
 to listen to the `end` event on the `outputStream` before notifying consumers of that file.
+
+`options` may be omitted or null and has the following structure and default values:
+
+```js
+{
+  forceZip64Format: false,
+}
+```
+
+If `forceZip64Format` is `true`, yazl will include some ZIP64 stuff regardless of whether or not it is actually required.
+This option really only exists for the purpose of easy testing of ZIP64 support.
 
 If specified and non-null, `finalSizeCallback` is given the parameters `(finalSize)`
 sometime during or after the call to `end()`.
