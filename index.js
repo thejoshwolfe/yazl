@@ -221,15 +221,24 @@ function calculateFinalSize(self) {
 var END_OF_CENTRAL_DIRECTORY_RECORD_SIZE = 22;
 function getEndOfCentralDirectoryRecord(self) {
   var buffer = new Buffer(END_OF_CENTRAL_DIRECTORY_RECORD_SIZE);
-  buffer.writeUInt32LE(0x06054b50, 0);           // end of central dir signature    4 bytes  (0x06054b50)
-  buffer.writeUInt16LE(0, 4);                    // number of this disk             2 bytes
-  buffer.writeUInt16LE(0, 6);                    // number of the disk with the     start of the central directory  2 bytes
-  buffer.writeUInt16LE(self.entries.length, 8);  // total number of entries in the  central directory on this disk  2 bytes
-  buffer.writeUInt16LE(self.entries.length, 10); // total number of entries in      the central directory           2 bytes
-  buffer.writeUInt32LE(self.outputStreamCursor - self.offsetOfStartOfCentralDirectory, 12); // size of the central directory   4 bytes
-  buffer.writeUInt32LE(self.offsetOfStartOfCentralDirectory, 16); // offset of start of central directory with respect to the starting disk number        4 bytes
-  buffer.writeUInt16LE(0, 20);                   // .ZIP file comment length        2 bytes
-  /* no comment */                               // .ZIP file comment       (variable size)
+  // end of central dir signature                       4 bytes  (0x06054b50)
+  buffer.writeUInt32LE(0x06054b50, 0);
+  // number of this disk                                2 bytes
+  buffer.writeUInt16LE(0, 4);
+  // number of the disk with the start of the central directory  2 bytes
+  buffer.writeUInt16LE(0, 6);
+  // total number of entries in the central directory on this disk  2 bytes
+  buffer.writeUInt16LE(self.entries.length, 8);
+  // total number of entries in the central directory   2 bytes
+  buffer.writeUInt16LE(self.entries.length, 10);
+  // size of the central directory                      4 bytes
+  buffer.writeUInt32LE(self.outputStreamCursor - self.offsetOfStartOfCentralDirectory, 12);
+  // offset of start of central directory with respect to the starting disk number  4 bytes
+  buffer.writeUInt32LE(self.offsetOfStartOfCentralDirectory, 16);
+  // .ZIP file comment length                           2 bytes
+  buffer.writeUInt16LE(0, 20);
+  // .ZIP file comment                                  (variable size)
+  // no comment
   return buffer;
 }
 
@@ -321,21 +330,34 @@ Entry.prototype.getLocalFileHeader = function() {
   var generalPurposeBitFlag = FILE_NAME_IS_UTF8;
   if (!this.crcAndFileSizeKnown) generalPurposeBitFlag |= UNKNOWN_CRC32_AND_FILE_SIZES;
 
-  fixedSizeStuff.writeUInt32LE(0x04034b50, 0);                  // local file header signature     4 bytes  (0x04034b50)
-  fixedSizeStuff.writeUInt16LE(VERSION_NEEDED_TO_EXTRACT, 4);   // version needed to extract       2 bytes
-  fixedSizeStuff.writeUInt16LE(generalPurposeBitFlag, 6);       // general purpose bit flag        2 bytes
-  fixedSizeStuff.writeUInt16LE(this.getCompressionMethod(), 8); // compression method              2 bytes
-  fixedSizeStuff.writeUInt16LE(this.lastModFileTime, 10);       // last mod file time              2 bytes
-  fixedSizeStuff.writeUInt16LE(this.lastModFileDate, 12);       // last mod file date              2 bytes
-  fixedSizeStuff.writeUInt32LE(crc32, 14);                      // crc-32                          4 bytes
-  fixedSizeStuff.writeUInt32LE(compressedSize, 18);             // compressed size                 4 bytes
-  fixedSizeStuff.writeUInt32LE(uncompressedSize, 22);           // uncompressed size               4 bytes
-  fixedSizeStuff.writeUInt16LE(this.utf8FileName.length, 26);   // file name length                2 bytes
-  fixedSizeStuff.writeUInt16LE(0, 28);                          // extra field length              2 bytes
+  // local file header signature     4 bytes  (0x04034b50)
+  fixedSizeStuff.writeUInt32LE(0x04034b50, 0);
+  // version needed to extract       2 bytes
+  fixedSizeStuff.writeUInt16LE(VERSION_NEEDED_TO_EXTRACT, 4);
+  // general purpose bit flag        2 bytes
+  fixedSizeStuff.writeUInt16LE(generalPurposeBitFlag, 6);
+  // compression method              2 bytes
+  fixedSizeStuff.writeUInt16LE(this.getCompressionMethod(), 8);
+  // last mod file time              2 bytes
+  fixedSizeStuff.writeUInt16LE(this.lastModFileTime, 10);
+  // last mod file date              2 bytes
+  fixedSizeStuff.writeUInt16LE(this.lastModFileDate, 12);
+  // crc-32                          4 bytes
+  fixedSizeStuff.writeUInt32LE(crc32, 14);
+  // compressed size                 4 bytes
+  fixedSizeStuff.writeUInt32LE(compressedSize, 18);
+  // uncompressed size               4 bytes
+  fixedSizeStuff.writeUInt32LE(uncompressedSize, 22);
+  // file name length                2 bytes
+  fixedSizeStuff.writeUInt16LE(this.utf8FileName.length, 26);
+  // extra field length              2 bytes
+  fixedSizeStuff.writeUInt16LE(0, 28);
   return Buffer.concat([
     fixedSizeStuff,
-    this.utf8FileName,                                          // file name (variable size)
-    /* no extra fields */                                       // extra field (variable size)
+    // file name (variable size)
+    this.utf8FileName,
+    // extra field (variable size)
+    // no extra fields
   ]);
 };
 var FILE_DESCRIPTOR_SIZE = 16
@@ -345,10 +367,14 @@ Entry.prototype.getFileDescriptor = function() {
     return new Buffer(0);
   }
   var buffer = new Buffer(FILE_DESCRIPTOR_SIZE);
-  buffer.writeUInt32LE(0x08074b50, 0);             // optional signature (required according to Archive Utility)
-  buffer.writeUInt32LE(this.crc32, 4);             // crc-32                          4 bytes
-  buffer.writeUInt32LE(this.compressedSize, 8);    // compressed size                 4 bytes
-  buffer.writeUInt32LE(this.uncompressedSize, 12); // uncompressed size               4 bytes
+  // optional signature (required according to Archive Utility)
+  buffer.writeUInt32LE(0x08074b50, 0);
+  // crc-32                          4 bytes
+  buffer.writeUInt32LE(this.crc32, 4);
+  // compressed size                 4 bytes
+  buffer.writeUInt32LE(this.compressedSize, 8);
+  // uncompressed size               4 bytes
+  buffer.writeUInt32LE(this.uncompressedSize, 12);
   return buffer;
 };
 var CENTRAL_DIRECTORY_RECORD_FIXED_SIZE = 46;
@@ -357,28 +383,48 @@ Entry.prototype.getCentralDirectoryRecord = function() {
   var generalPurposeBitFlag = FILE_NAME_IS_UTF8;
   if (!this.crcAndFileSizeKnown) generalPurposeBitFlag |= UNKNOWN_CRC32_AND_FILE_SIZES;
   
-  fixedSizeStuff.writeUInt32LE(0x02014b50, 0);                        // central file header signature   4 bytes  (0x02014b50)
-  fixedSizeStuff.writeUInt16LE(VERSION_MADE_BY_INFO_ZIP, 4);          // version made by                 2 bytes
-  fixedSizeStuff.writeUInt16LE(VERSION_NEEDED_TO_EXTRACT, 6);         // version needed to extract       2 bytes
-  fixedSizeStuff.writeUInt16LE(generalPurposeBitFlag, 8);             // general purpose bit flag        2 bytes
-  fixedSizeStuff.writeUInt16LE(this.getCompressionMethod(), 10);      // compression method              2 bytes
-  fixedSizeStuff.writeUInt16LE(this.lastModFileTime, 12);             // last mod file time              2 bytes
-  fixedSizeStuff.writeUInt16LE(this.lastModFileDate, 14);             // last mod file date              2 bytes
-  fixedSizeStuff.writeUInt32LE(this.crc32, 16);                       // crc-32                          4 bytes
-  fixedSizeStuff.writeUInt32LE(this.compressedSize, 20);              // compressed size                 4 bytes
-  fixedSizeStuff.writeUInt32LE(this.uncompressedSize, 24);            // uncompressed size               4 bytes
-  fixedSizeStuff.writeUInt16LE(this.utf8FileName.length, 28);         // file name length                2 bytes
-  fixedSizeStuff.writeUInt16LE(0, 30);                                // extra field length              2 bytes
-  fixedSizeStuff.writeUInt16LE(0, 32);                                // file comment length             2 bytes
-  fixedSizeStuff.writeUInt16LE(0, 34);                                // disk number start               2 bytes
-  fixedSizeStuff.writeUInt16LE(0, 36);                                // internal file attributes        2 bytes
-  fixedSizeStuff.writeUInt32LE(this.externalFileAttributes, 38);      // external file attributes        4 bytes
-  fixedSizeStuff.writeUInt32LE(this.relativeOffsetOfLocalHeader, 42); // relative offset of local header 4 bytes
+  // central file header signature   4 bytes  (0x02014b50)
+  fixedSizeStuff.writeUInt32LE(0x02014b50, 0);
+  // version made by                 2 bytes
+  fixedSizeStuff.writeUInt16LE(VERSION_MADE_BY_INFO_ZIP, 4);
+  // version needed to extract       2 bytes
+  fixedSizeStuff.writeUInt16LE(VERSION_NEEDED_TO_EXTRACT, 6);
+  // general purpose bit flag        2 bytes
+  fixedSizeStuff.writeUInt16LE(generalPurposeBitFlag, 8);
+  // compression method              2 bytes
+  fixedSizeStuff.writeUInt16LE(this.getCompressionMethod(), 10);
+  // last mod file time              2 bytes
+  fixedSizeStuff.writeUInt16LE(this.lastModFileTime, 12);
+  // last mod file date              2 bytes
+  fixedSizeStuff.writeUInt16LE(this.lastModFileDate, 14);
+  // crc-32                          4 bytes
+  fixedSizeStuff.writeUInt32LE(this.crc32, 16);
+  // compressed size                 4 bytes
+  fixedSizeStuff.writeUInt32LE(this.compressedSize, 20);
+  // uncompressed size               4 bytes
+  fixedSizeStuff.writeUInt32LE(this.uncompressedSize, 24);
+  // file name length                2 bytes
+  fixedSizeStuff.writeUInt16LE(this.utf8FileName.length, 28);
+  // extra field length              2 bytes
+  fixedSizeStuff.writeUInt16LE(0, 30);
+  // file comment length             2 bytes
+  fixedSizeStuff.writeUInt16LE(0, 32);
+  // disk number start               2 bytes
+  fixedSizeStuff.writeUInt16LE(0, 34);
+  // internal file attributes        2 bytes
+  fixedSizeStuff.writeUInt16LE(0, 36);
+  // external file attributes        4 bytes
+  fixedSizeStuff.writeUInt32LE(this.externalFileAttributes, 38);
+  // relative offset of local header 4 bytes
+  fixedSizeStuff.writeUInt32LE(this.relativeOffsetOfLocalHeader, 42);
   return Buffer.concat([
     fixedSizeStuff,
-    this.utf8FileName,                                                // file name (variable size)
-    /* no extra fields */                                             // extra field (variable size)
-    /* empty comment */                                               // file comment (variable size)
+    // file name (variable size)
+    this.utf8FileName,
+    // extra field (variable size)
+    // no extra fields
+    // file comment (variable size)
+    // empty comment
   ]);
 };
 Entry.prototype.getCompressionMethod = function() {
