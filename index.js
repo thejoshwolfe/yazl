@@ -218,28 +218,95 @@ function calculateFinalSize(self) {
   return result;
 }
 
+var ZIP64_END_OF_CENTRAL_DIRECTORY_RECORD_SIZE = 56;
+var ZIP64_END_OF_CENTRAL_DIRECTORY_LOCATOR_SIZE = 20;
 var END_OF_CENTRAL_DIRECTORY_RECORD_SIZE = 22;
 function getEndOfCentralDirectoryRecord(self) {
-  var buffer = new Buffer(END_OF_CENTRAL_DIRECTORY_RECORD_SIZE);
+  var needZip64Format = false;
+  // TODO: move this check to calculateFinalSize so we know if we need the ZIP64 stuff earlier.
+  var normalEntriesLength = self.entries.length;
+  if (self.forceZip64Format || self.entries.length >= 0xffff) {
+    normalEntriesLength = 0xffff;
+    needZip64Format = true;
+  }
+  var sizeOfCentralDirectory = self.outputStreamCursor - self.offsetOfStartOfCentralDirectory;
+  var normalSizeOfCentralDirectory = sizeOfCentralDirectory;
+  if (self.forceZip64Format || sizeOfCentralDirectory >= 0xffffffff) {
+    normalSizeOfCentralDirectory = 0xffffffff;
+    needZip64Format = true;
+  }
+  var normalOffsetOfStartOfCentralDirectory = self.offsetOfStartOfCentralDirectory;
+  if (self.forceZip64Format || self.offsetOfStartOfCentralDirectory >= 0xffffffff) {
+    normalOffsetOfStartOfCentralDirectory = 0xffffffff;
+    needZip64Format = true;
+  }
+
+  var eocdrBuffer = new Buffer(END_OF_CENTRAL_DIRECTORY_RECORD_SIZE);
   // end of central dir signature                       4 bytes  (0x06054b50)
-  buffer.writeUInt32LE(0x06054b50, 0);
+  eocdrBuffer.writeUInt32LE(0x06054b50, 0);
   // number of this disk                                2 bytes
-  buffer.writeUInt16LE(0, 4);
+  eocdrBuffer.writeUInt16LE(0, 4);
   // number of the disk with the start of the central directory  2 bytes
-  buffer.writeUInt16LE(0, 6);
+  eocdrBuffer.writeUInt16LE(0, 6);
   // total number of entries in the central directory on this disk  2 bytes
-  buffer.writeUInt16LE(self.entries.length, 8);
+  eocdrBuffer.writeUInt16LE(normalEntriesLength, 8);
   // total number of entries in the central directory   2 bytes
-  buffer.writeUInt16LE(self.entries.length, 10);
+  eocdrBuffer.writeUInt16LE(normalEntriesLength, 10);
   // size of the central directory                      4 bytes
-  buffer.writeUInt32LE(self.outputStreamCursor - self.offsetOfStartOfCentralDirectory, 12);
+  eocdrBuffer.writeUInt32LE(normalSizeOfCentralDirectory, 12);
   // offset of start of central directory with respect to the starting disk number  4 bytes
-  buffer.writeUInt32LE(self.offsetOfStartOfCentralDirectory, 16);
+  eocdrBuffer.writeUInt32LE(normalOffsetOfStartOfCentralDirectory, 16);
   // .ZIP file comment length                           2 bytes
-  buffer.writeUInt16LE(0, 20);
+  eocdrBuffer.writeUInt16LE(0, 20);
   // .ZIP file comment                                  (variable size)
   // no comment
-  return buffer;
+
+  if (!needZip64Format) return eocdrBuffer;
+
+  // ZIP64 format
+  // ZIP64 End of Central Directory Record
+  var zip64EocdrBuffer = new Buffer(ZIP64_END_OF_CENTRAL_DIRECTORY_RECORD_SIZE);
+  // zip64 end of central dir signature                                             4 bytes  (0x06064b50)
+  zip64EocdrBuffer.writeUInt32LE(0x06064b50, 0);
+  // size of zip64 end of central directory record                                  8 bytes
+  writeUInt64LE(zip64EocdrBuffer, ZIP64_END_OF_CENTRAL_DIRECTORY_RECORD_SIZE, 4);
+  // version made by                                                                2 bytes
+  zip64EocdrBuffer.writeUInt16LE(VERSION_MADE_BY_INFO_ZIP, 12);
+  // version needed to extract                                                      2 bytes
+  zip64EocdrBuffer.writeUInt16LE(VERSION_NEEDED_TO_EXTRACT, 14);
+  // number of this disk                                                            4 bytes
+  zip64EocdrBuffer.writeUInt32LE(0, 16);
+  // number of the disk with the start of the central directory                     4 bytes
+  zip64EocdrBuffer.writeUInt32LE(0, 20);
+  // total number of entries in the central directory on this disk                  8 bytes
+  writeUInt64LE(zip64EocdrBuffer, self.entries.length, 24);
+  // total number of entries in the central directory                               8 bytes
+  writeUInt64LE(zip64EocdrBuffer, self.entries.length, 32);
+  // size of the central directory                                                  8 bytes
+  writeUInt64LE(zip64EocdrBuffer, sizeOfCentralDirectory, 40);
+  // offset of start of central directory with respect to the starting disk number  8 bytes
+  writeUInt64LE(zip64EocdrBuffer, self.offsetOfStartOfCentralDirectory, 48);
+  // zip64 extensible data sector                                                   (variable size)
+  // nothing in the zip64 extensible data sector
+
+
+  // ZIP64 End of Central Directory Locator
+  var zip64EocdlBuffer = new Buffer(ZIP64_END_OF_CENTRAL_DIRECTORY_LOCATOR_SIZE);
+  // zip64 end of central dir locator signature                               4 bytes  (0x07064b50)
+  zip64EocdlBuffer.writeUInt32LE(0x07064b50, 0);
+  // number of the disk with the start of the zip64 end of central directory  4 bytes
+  zip64EocdlBuffer.writeUInt32LE(0, 4);
+  // relative offset of the zip64 end of central directory record             8 bytes
+  writeUInt64LE(zip64EocdlBuffer, this.outputStreamCursor, 8);
+  // total number of disks                                                    4 bytes
+  zip64EocdlBuffer.writeUInt32LE(0, 16);
+
+
+  return Buffer.concat([
+    zip64EocdrBuffer,
+    zip64EocdlBuffer,
+    eocdrBuffer,
+  ]);
 }
 
 function validateMetadataPath(metadataPath, isDirectory) {
@@ -445,6 +512,14 @@ function dateToDosDateTime(jsDate) {
   time |= (jsDate.getHours() & 0x1f) << 11; // 0-23
 
   return {date: date, time: time};
+}
+
+function writeUInt64LE(buffer, n, offset) {
+  // can't use bitshift here, because JavaScript only allows bitshiting on 32-bit integers.
+  var high = Math.floor(n / 0x100000000);
+  var low = n % 0x100000000;
+  buffer.writeUInt32LE(low, offset);
+  buffer.writeUInt32LE(high, offset + 4);
 }
 
 function defaultCallback(err) {
