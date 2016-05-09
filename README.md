@@ -272,6 +272,8 @@ In order to create empty directories, use `addEmptyDirectory()`.
 
 ## Change History
 
+ * 2.3.1
+   * Remove `.npmignore` from npm package. [pull #22](https://github.com/thejoshwolfe/yazl/pull/22)
  * 2.3.0
    * `metadataPath` can have `\` characters now; they will be replaced with `/`. [issue #18](https://github.com/thejoshwolfe/yazl/issues/18)
  * 2.2.2
