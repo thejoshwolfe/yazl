@@ -28,5 +28,8 @@
   "devDependencies": {
     "bl": "~0.9.3",
     "yauzl": "~2.3.1"
-  }
+  },
+  "files": [
+    "index.js"
+  ]
 }
