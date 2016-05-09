@@ -214,16 +214,16 @@ function calculateFinalSize(self) {
               CENTRAL_DIRECTORY_RECORD_FIXED_SIZE + entry.utf8FileName.length;
     if (!entry.crcAndFileSizeKnown) result += FILE_DESCRIPTOR_SIZE;
   }
-  result += END_OF_CENTRAL_DIRECTORY_RECORD_SIZE;
+  // just get the size of the eocdr and friends
+  result += getEndOfCentralDirectoryRecord(self, true);
   return result;
 }
 
 var ZIP64_END_OF_CENTRAL_DIRECTORY_RECORD_SIZE = 56;
 var ZIP64_END_OF_CENTRAL_DIRECTORY_LOCATOR_SIZE = 20;
 var END_OF_CENTRAL_DIRECTORY_RECORD_SIZE = 22;
-function getEndOfCentralDirectoryRecord(self) {
+function getEndOfCentralDirectoryRecord(self, actuallyJustTellMeHowLongItWouldBe) {
   var needZip64Format = false;
-  // TODO: move this check to calculateFinalSize so we know if we need the ZIP64 stuff earlier.
   var normalEntriesLength = self.entries.length;
   if (self.forceZip64Format || self.entries.length >= 0xffff) {
     normalEntriesLength = 0xffff;
@@ -239,6 +239,17 @@ function getEndOfCentralDirectoryRecord(self) {
   if (self.forceZip64Format || self.offsetOfStartOfCentralDirectory >= 0xffffffff) {
     normalOffsetOfStartOfCentralDirectory = 0xffffffff;
     needZip64Format = true;
+  }
+  if (actuallyJustTellMeHowLongItWouldBe) {
+    if (needZip64Format) {
+      return (
+        ZIP64_END_OF_CENTRAL_DIRECTORY_RECORD_SIZE +
+        ZIP64_END_OF_CENTRAL_DIRECTORY_LOCATOR_SIZE +
+        END_OF_CENTRAL_DIRECTORY_RECORD_SIZE
+      );
+    } else {
+      return END_OF_CENTRAL_DIRECTORY_RECORD_SIZE;
+    }
   }
 
   var eocdrBuffer = new Buffer(END_OF_CENTRAL_DIRECTORY_RECORD_SIZE);
