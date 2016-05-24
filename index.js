@@ -308,7 +308,7 @@ function getEndOfCentralDirectoryRecord(self, actuallyJustTellMeHowLongItWouldBe
   // number of the disk with the start of the zip64 end of central directory  4 bytes
   zip64EocdlBuffer.writeUInt32LE(0, 4);
   // relative offset of the zip64 end of central directory record             8 bytes
-  writeUInt64LE(zip64EocdlBuffer, this.outputStreamCursor, 8);
+  writeUInt64LE(zip64EocdlBuffer, self.outputStreamCursor, 8);
   // total number of disks                                                    4 bytes
   zip64EocdlBuffer.writeUInt32LE(0, 16);
 
