@@ -1,6 +1,6 @@
 var usage =
   "node " + __filename.replace(/.*[\/\\]/, "") + " " +
-  "[FILE | --compress | --no-compress | --buffer | --no-buffer | --zip64 | --no-zip64]... -o OUTPUT.zip" + "\n" +
+  "[FILE | --compress | --no-compress | --buffer | --no-buffer | --zip64={true|false|auto}]... -o OUTPUT.zip" + "\n" +
   "\n" +
   "all arguments and switches are processed in order. for example:" + "\n" +
   "  node zip.js --compress a.txt --no-compress b.txt -o out.zip" + "\n" +
@@ -9,7 +9,7 @@ var yazl = require("../");
 var fs = require("fs");
 
 var zipfile = new yazl.ZipFile();
-var options = {compress: false, forceZip64Format: false};
+var options = {compress: false, zip64: false};
 var use_buffer = false;
 
 var args = process.argv.slice(2);
@@ -25,21 +25,26 @@ var its_the_dash_o = false;
 args.forEach(function(arg) {
   if (its_the_dash_o) {
     its_the_dash_o = false;
-    zipfile.outputStream.pipe(fs.createWriteStream(arg));
+    var stream = arg === "-" ? process.stdout : fs.createWriteStream(arg);
+    zipfile.outputStream.pipe(stream);
   } else if (arg === "--compress") {
     options.compress = true;
   } else if (arg === "--no-compress") {
     options.compress = false;
   } else if (arg === "--buffer") {
     use_buffer = true;
-  } else if (arg === "--no-zip64") {
-    options.forceZip64Format = false;
-  } else if (arg === "--zip64") {
-    options.forceZip64Format = true;
+  } else if (arg === "--zip64=true") {
+    options.zip64 = true;
+  } else if (arg === "--zip64=false") {
+    options.zip64 = false;
+  } else if (arg === "--zip64=auto") {
+    options.zip64 = "auto";
   } else if (arg === "--no-buffer") {
     use_buffer = false;
   } else if (arg === "-o") {
     its_the_dash_o = true;
+  } else if (arg === "-") {
+    zipfile.addReadStream(process.stdin);
   } else {
     // file thing
     var stats = fs.statSync(arg);
@@ -56,4 +61,4 @@ args.forEach(function(arg) {
     }
   }
 });
-zipfile.end({forceZip64Format: options.forceZip64Format});
+zipfile.end({zip64: options.zip64});

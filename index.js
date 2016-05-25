@@ -16,7 +16,7 @@ function ZipFile() {
   this.outputStreamCursor = 0;
   this.ended = false; // .end() sets this
   this.allDone = false; // set when we've written the last bytes
-  this.forceZip64Format = false;
+  this.zip64 = null;
 }
 
 ZipFile.prototype.addFile = function(realPath, metadataPath, options) {
@@ -78,7 +78,7 @@ ZipFile.prototype.addBuffer = function(buffer, metadataPath, options) {
     entry.compressedSize = compressedBuffer.length;
     entry.setFileDataPumpFunction(function() {
       writeToOutputStream(self, compressedBuffer);
-      writeToOutputStream(self, entry.getFileDescriptor());
+      writeToOutputStream(self, entry.getDataDescriptor());
       entry.state = Entry.FILE_DATA_DONE;
 
       // don't call pumpEntries() recursively.
@@ -100,7 +100,7 @@ ZipFile.prototype.addEmptyDirectory = function(metadataPath, options) {
   var entry = new Entry(metadataPath, true, options);
   self.entries.push(entry);
   entry.setFileDataPumpFunction(function() {
-    writeToOutputStream(self, entry.getFileDescriptor());
+    writeToOutputStream(self, entry.getDataDescriptor());
     entry.state = Entry.FILE_DATA_DONE;
     pumpEntries(self);
   });
@@ -116,7 +116,7 @@ ZipFile.prototype.end = function(options, finalSizeCallback) {
   if (this.ended) return;
   this.ended = true;
   this.finalSizeCallback = finalSizeCallback;
-  this.forceZip64Format = !!options.forceZip64Format;
+  this.zip64 = options.zip64;
   pumpEntries(this);
 };
 
@@ -144,7 +144,7 @@ function pumpFileDataReadStream(self, entry, readStream) {
     }
     entry.compressedSize = compressedSizeCounter.byteCount;
     self.outputStreamCursor += entry.compressedSize;
-    writeToOutputStream(self, entry.getFileDescriptor());
+    writeToOutputStream(self, entry.getDataDescriptor());
     entry.state = Entry.FILE_DATA_DONE;
     pumpEntries(self);
   });
@@ -211,8 +211,15 @@ function calculateFinalSize(self) {
     }
     result += LOCAL_FILE_HEADER_FIXED_SIZE + entry.utf8FileName.length +
               entry.uncompressedSize +
+              // then the data descriptor; see below.
               CENTRAL_DIRECTORY_RECORD_FIXED_SIZE + entry.utf8FileName.length;
-    if (!entry.crcAndFileSizeKnown) result += FILE_DESCRIPTOR_SIZE;
+    if (!entry.crcAndFileSizeKnown) {
+      if (entry.zip64 === true) {
+        result += DATA_DESCRIPTOR_SIZE;
+      } else {
+        result += ZIP64_DATA_DESCRIPTOR_SIZE;
+      }
+    }
   }
   // just get the size of the eocdr and friends
   result += getEndOfCentralDirectoryRecord(self, true);
@@ -225,18 +232,18 @@ var END_OF_CENTRAL_DIRECTORY_RECORD_SIZE = 22;
 function getEndOfCentralDirectoryRecord(self, actuallyJustTellMeHowLongItWouldBe) {
   var needZip64Format = false;
   var normalEntriesLength = self.entries.length;
-  if (self.forceZip64Format || self.entries.length >= 0xffff) {
+  if (self.zip64 === true || self.entries.length >= 0xffff) {
     normalEntriesLength = 0xffff;
     needZip64Format = true;
   }
   var sizeOfCentralDirectory = self.outputStreamCursor - self.offsetOfStartOfCentralDirectory;
   var normalSizeOfCentralDirectory = sizeOfCentralDirectory;
-  if (self.forceZip64Format || sizeOfCentralDirectory >= 0xffffffff) {
+  if (self.zip64 === true || sizeOfCentralDirectory >= 0xffffffff) {
     normalSizeOfCentralDirectory = 0xffffffff;
     needZip64Format = true;
   }
   var normalOffsetOfStartOfCentralDirectory = self.offsetOfStartOfCentralDirectory;
-  if (self.forceZip64Format || self.offsetOfStartOfCentralDirectory >= 0xffffffff) {
+  if (self.zip64 === true || self.offsetOfStartOfCentralDirectory >= 0xffffffff) {
     normalOffsetOfStartOfCentralDirectory = 0xffffffff;
     needZip64Format = true;
   }
@@ -366,7 +373,7 @@ function Entry(metadataPath, isDirectory, options) {
     this.compress = true; // default
     if (options.compress != null) this.compress = !!options.compress;
   }
-  this.forceZip64Format = !!options.forceZip64Format;
+  this.zip64 = options.zip64;
 }
 Entry.WAITING_FOR_METADATA = 0;
 Entry.READY_TO_PUMP_FILE_DATA = 1;
@@ -388,8 +395,8 @@ Entry.prototype.setFileDataPumpFunction = function(doFileDataPump) {
   this.state = Entry.READY_TO_PUMP_FILE_DATA;
 };
 var LOCAL_FILE_HEADER_FIXED_SIZE = 30;
-// this version enables utf8 filename encoding
-var VERSION_NEEDED_TO_EXTRACT = 0x0014;
+// this version enables zip64
+var VERSION_NEEDED_TO_EXTRACT = 45;
 // this is the "version made by" reported by linux info-zip.
 var VERSION_MADE_BY_INFO_ZIP = 0x031e;
 var FILE_NAME_IS_UTF8 = 1 << 11;
@@ -438,29 +445,87 @@ Entry.prototype.getLocalFileHeader = function() {
     // no extra fields
   ]);
 };
-var FILE_DESCRIPTOR_SIZE = 16
-Entry.prototype.getFileDescriptor = function() {
+var DATA_DESCRIPTOR_SIZE = 16;
+var ZIP64_DATA_DESCRIPTOR_SIZE = 24;
+Entry.prototype.getDataDescriptor = function() {
+  if (this.compressedSize   >= 0xffffffff ||
+      this.uncompressedSize >= 0xffffffff) {
+    if (this.zip64 === false) {
+      // TODO: this is supposed to be an error
+    }
+    this.zip64 = true;
+  }
   if (this.crcAndFileSizeKnown) {
     // MAC's Archive Utility requires this not be present unless we set general purpose bit 3
     return new Buffer(0);
   }
-  var buffer = new Buffer(FILE_DESCRIPTOR_SIZE);
-  // optional signature (required according to Archive Utility)
-  buffer.writeUInt32LE(0x08074b50, 0);
-  // crc-32                          4 bytes
-  buffer.writeUInt32LE(this.crc32, 4);
-  // compressed size                 4 bytes
-  buffer.writeUInt32LE(this.compressedSize, 8);
-  // uncompressed size               4 bytes
-  buffer.writeUInt32LE(this.uncompressedSize, 12);
-  return buffer;
+  if (this.zip64 !== true) {
+    var buffer = new Buffer(DATA_DESCRIPTOR_SIZE);
+    // optional signature (required according to Archive Utility)
+    buffer.writeUInt32LE(0x08074b50, 0);
+    // crc-32                          4 bytes
+    buffer.writeUInt32LE(this.crc32, 4);
+    // compressed size                 4 bytes
+    buffer.writeUInt32LE(this.compressedSize, 8);
+    // uncompressed size               4 bytes
+    buffer.writeUInt32LE(this.uncompressedSize, 12);
+    return buffer;
+  } else {
+    // ZIP64 format
+    var buffer = new Buffer(ZIP64_DATA_DESCRIPTOR_SIZE);
+    // optional signature (unknown if anyone cares about this)
+    buffer.writeUInt32LE(0x08074b50, 0);
+    // crc-32                          4 bytes
+    buffer.writeUInt32LE(this.crc32, 4);
+    // compressed size                 8 bytes
+    writeUInt64LE(buffer, this.compressedSize, 8);
+    // uncompressed size               8 bytes
+    writeUInt64LE(buffer, this.uncompressedSize, 16);
+    return buffer;
+  }
 };
 var CENTRAL_DIRECTORY_RECORD_FIXED_SIZE = 46;
+var ZIP64_EXTENDED_INFORMATION_EXTRA_FIELD_SIZE = 28;
 Entry.prototype.getCentralDirectoryRecord = function() {
   var fixedSizeStuff = new Buffer(CENTRAL_DIRECTORY_RECORD_FIXED_SIZE);
   var generalPurposeBitFlag = FILE_NAME_IS_UTF8;
   if (!this.crcAndFileSizeKnown) generalPurposeBitFlag |= UNKNOWN_CRC32_AND_FILE_SIZES;
-  
+
+  var normalCompressedSize = this.compressedSize;
+  var normalUncompressedSize = this.uncompressedSize;
+  var normalRelativeOffsetOfLocalHeader = this.relativeOffsetOfLocalHeader;
+  if (normalCompressedSize              >= 0xffffffff ||
+      normalUncompressedSize            >= 0xffffffff ||
+      normalRelativeOffsetOfLocalHeader >= 0xffffffff) {
+    if (this.zip64 === false) {
+      // TODO: this is supposed to be an error
+    }
+    this.zip64 = true;
+  }
+  var zeiefBuffer;
+  if (this.zip64 === true) {
+    normalCompressedSize = 0xffffffff;
+    normalUncompressedSize = 0xffffffff;
+    normalRelativeOffsetOfLocalHeader = 0xffffffff;
+
+    // ZIP64 extended information extra field
+    zeiefBuffer = new Buffer(ZIP64_EXTENDED_INFORMATION_EXTRA_FIELD_SIZE);
+    // 0x0001                  2 bytes    Tag for this "extra" block type
+    zeiefBuffer.writeUInt16LE(0x0001, 0);
+    // Size                    2 bytes    Size of this "extra" block
+    zeiefBuffer.writeUInt16LE(ZIP64_EXTENDED_INFORMATION_EXTRA_FIELD_SIZE - 4, 2);
+    // Original Size           8 bytes    Original uncompressed file size
+    writeUInt64LE(zeiefBuffer, this.uncompressedSize, 4);
+    // Compressed Size         8 bytes    Size of compressed data
+    writeUInt64LE(zeiefBuffer, this.compressedSize, 12);
+    // Relative Header Offset  8 bytes    Offset of local header record
+    writeUInt64LE(zeiefBuffer, this.relativeOffsetOfLocalHeader, 20);
+    // Disk Start Number       4 bytes    Number of the disk on which this file starts
+    // (omit)
+  } else {
+    zeiefBuffer = new Buffer(0);
+  }
+
   // central file header signature   4 bytes  (0x02014b50)
   fixedSizeStuff.writeUInt32LE(0x02014b50, 0);
   // version made by                 2 bytes
@@ -478,13 +543,13 @@ Entry.prototype.getCentralDirectoryRecord = function() {
   // crc-32                          4 bytes
   fixedSizeStuff.writeUInt32LE(this.crc32, 16);
   // compressed size                 4 bytes
-  fixedSizeStuff.writeUInt32LE(this.compressedSize, 20);
+  fixedSizeStuff.writeUInt32LE(normalCompressedSize, 20);
   // uncompressed size               4 bytes
-  fixedSizeStuff.writeUInt32LE(this.uncompressedSize, 24);
+  fixedSizeStuff.writeUInt32LE(normalUncompressedSize, 24);
   // file name length                2 bytes
   fixedSizeStuff.writeUInt16LE(this.utf8FileName.length, 28);
   // extra field length              2 bytes
-  fixedSizeStuff.writeUInt16LE(0, 30);
+  fixedSizeStuff.writeUInt16LE(zeiefBuffer.length, 30);
   // file comment length             2 bytes
   fixedSizeStuff.writeUInt16LE(0, 32);
   // disk number start               2 bytes
@@ -494,13 +559,14 @@ Entry.prototype.getCentralDirectoryRecord = function() {
   // external file attributes        4 bytes
   fixedSizeStuff.writeUInt32LE(this.externalFileAttributes, 38);
   // relative offset of local header 4 bytes
-  fixedSizeStuff.writeUInt32LE(this.relativeOffsetOfLocalHeader, 42);
+  fixedSizeStuff.writeUInt32LE(normalRelativeOffsetOfLocalHeader, 42);
+
   return Buffer.concat([
     fixedSizeStuff,
     // file name (variable size)
     this.utf8FileName,
     // extra field (variable size)
-    // no extra fields
+    zeiefBuffer,
     // file comment (variable size)
     // empty comment
   ]);

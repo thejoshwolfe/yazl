@@ -68,7 +68,7 @@ File paths must not end with `"/"`.
   mtime: stats.mtime,
   mode: stats.mode,
   compress: true,
-  forceZip64Format: false,
+  zip64: false,
 }
 ```
 
@@ -82,7 +82,13 @@ yazl does not store group and user ids in the zip file.
 If `compress` is `true`, the file data will be deflated (compression method 8).
 If `compress` is `false`, the file data will be stored (compression method 0).
 
-If `forceZip64Format` is `true`, yazl will use some of the ZIP64 format for this entry
+If `zip64` is `false` (or omitted or null), this zipfile will emit an error
+if this archive would require ZIP64 format, assuming this is the last entry.
+If `zip64` is `true`, yazl will use ZIP64 format in this entry's local file header
+and/or data descriptor regardless of if it's required or not (this may be useful for testing.).
+If `zip64` is `"auto"`, yazl will use ZIP64 format in this entry's local file header
+and/or data descriptor if it is required.
+
 regardless of whether it is actually required.
 This option really only exists for the purpose of easy testing of ZIP64 support.
 
@@ -102,12 +108,12 @@ See `addFile()` for info about the `metadataPath` parameter.
   mtime: new Date(),
   mode: 0100664,
   compress: true,
-  forceZip64Format: false,
+  zip64: false,
   size: 12345, // example value
 }
 ```
 
-See `addFile()` for the meaning of `mtime`, `mode`, `compress`, and `forceZip64Format`.
+See `addFile()` for the meaning of `mtime`, `mode`, `compress`, and `zip64`.
 If `size` is given, it will be checked against the actual number of bytes in the `readStream`,
 and an error will be emitted if there is a mismatch.
 
@@ -125,11 +131,11 @@ See `addFile()` for info about the `metadataPath` parameter.
   mtime: new Date(),
   mode: 0100664,
   compress: true,
-  forceZip64Format: false,
+  zip64: false,
 }
 ```
 
-See `addFile()` for the meaning of `mtime`, `mode`, `compress`, and `forceZip64Format`.
+See `addFile()` for the meaning of `mtime`, `mode`, `compress`, and `zip64`.
 
 This method has the unique property that General Purpose Bit `3` will not be used in the Local File Header.
 This doesn't matter for unzip implementations that conform to the Zip File Spec.
@@ -171,12 +177,14 @@ to listen to the `end` event on the `outputStream` before notifying consumers of
 
 ```js
 {
-  forceZip64Format: false,
+  zip64: "auto",
 }
 ```
 
-If `forceZip64Format` is `true`, yazl will include some ZIP64 stuff regardless of whether or not it is actually required.
-This option really only exists for the purpose of easy testing of ZIP64 support.
+If `zip64` is `false`, yazl will emit an error if ZIP64 format is required in the central directory.
+If `zip64` is `"auto"` (or omitted or null), yazl will use ZIP64 format in the central directory if necessary.
+If `zip64` is `true`, yazl will use ZIP64 format in the central directory regardless of whether or not it is required.
+(The value `true` can be useful for testing.)
 
 If specified and non-null, `finalSizeCallback` is given the parameters `(finalSize)`
 sometime during or after the call to `end()`.
@@ -240,9 +248,8 @@ and has implications in the External File Attributes.
 
 ### Version Needed to Extract
 
-Always `0x0014`.
-Without this value, Info-Zip, and possibly other unzip implementations,
-refuse to acknowledge General Purpose Bit `8`, which enables utf8 filename encoding.
+Always `45`, meaning 4.5.
+This enables the ZIP64 format.
 
 ### General Purpose Bit Flag
 
@@ -252,14 +259,14 @@ Filenames are always encoded in utf8, even if the result is indistinguishable fr
 Bit `3` is usually set in the Local File Header.
 To support both a streaming input and streaming output api,
 it is impossible to know the crc32 before processing the file data.
-When bit `3` is set, file Descriptors are given after each file data with this information, as per the spec.
+When bit `3` is set, data Descriptors are given after each file data with this information, as per the spec.
 But remember a complete metadata listing is still always available in the central directory record,
 so if unzip implementations are relying on that, like they should,
 none of this paragraph will matter anyway.
 Even so, some popular unzip implementations do not follow the spec.
-Mac's Archive Utility requires File Descriptors to include the optional signature,
-so yazl includes the optional file descriptor signature.
-When bit `3` is not used, Mac's Archive Utility requires there to be no file descriptor, so yazl skips it in that case.
+Mac's Archive Utility requires Data Descriptors to include the optional signature,
+so yazl includes the optional data descriptor signature.
+When bit `3` is not used, Mac's Archive Utility requires there to be no data descriptor, so yazl skips it in that case.
 Additionally, 7-Zip 9.20 does not seem to support bit `3` at all
 (see [issue #11](https://github.com/thejoshwolfe/yazl/issues/11)).
 
