@@ -289,7 +289,7 @@ function getEndOfCentralDirectoryRecord(self, actuallyJustTellMeHowLongItWouldBe
   // size of zip64 end of central directory record                                  8 bytes
   writeUInt64LE(zip64EocdrBuffer, ZIP64_END_OF_CENTRAL_DIRECTORY_RECORD_SIZE, 4);
   // version made by                                                                2 bytes
-  zip64EocdrBuffer.writeUInt16LE(VERSION_MADE_BY_INFO_ZIP, 12);
+  zip64EocdrBuffer.writeUInt16LE(VERSION_MADE_BY, 12);
   // version needed to extract                                                      2 bytes
   zip64EocdrBuffer.writeUInt16LE(VERSION_NEEDED_TO_EXTRACT, 14);
   // number of this disk                                                            4 bytes
@@ -317,7 +317,7 @@ function getEndOfCentralDirectoryRecord(self, actuallyJustTellMeHowLongItWouldBe
   // relative offset of the zip64 end of central directory record             8 bytes
   writeUInt64LE(zip64EocdlBuffer, self.outputStreamCursor, 8);
   // total number of disks                                                    4 bytes
-  zip64EocdlBuffer.writeUInt32LE(0, 16);
+  zip64EocdlBuffer.writeUInt32LE(1, 16);
 
 
   return Buffer.concat([
@@ -397,8 +397,8 @@ Entry.prototype.setFileDataPumpFunction = function(doFileDataPump) {
 var LOCAL_FILE_HEADER_FIXED_SIZE = 30;
 // this version enables zip64
 var VERSION_NEEDED_TO_EXTRACT = 45;
-// this is the "version made by" reported by linux info-zip.
-var VERSION_MADE_BY_INFO_ZIP = 0x031e;
+// 3 = unix. 63 = spec version 6.3
+var VERSION_MADE_BY = (3 << 8) | 63;
 var FILE_NAME_IS_UTF8 = 1 << 11;
 var UNKNOWN_CRC32_AND_FILE_SIZES = 1 << 3;
 Entry.prototype.getLocalFileHeader = function() {
@@ -529,7 +529,7 @@ Entry.prototype.getCentralDirectoryRecord = function() {
   // central file header signature   4 bytes  (0x02014b50)
   fixedSizeStuff.writeUInt32LE(0x02014b50, 0);
   // version made by                 2 bytes
-  fixedSizeStuff.writeUInt16LE(VERSION_MADE_BY_INFO_ZIP, 4);
+  fixedSizeStuff.writeUInt16LE(VERSION_MADE_BY, 4);
   // version needed to extract       2 bytes
   fixedSizeStuff.writeUInt16LE(VERSION_NEEDED_TO_EXTRACT, 6);
   // general purpose bit flag        2 bytes
