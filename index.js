@@ -287,7 +287,7 @@ function getEndOfCentralDirectoryRecord(self, actuallyJustTellMeHowLongItWouldBe
   // zip64 end of central dir signature                                             4 bytes  (0x06064b50)
   zip64EocdrBuffer.writeUInt32LE(0x06064b50, 0);
   // size of zip64 end of central directory record                                  8 bytes
-  writeUInt64LE(zip64EocdrBuffer, ZIP64_END_OF_CENTRAL_DIRECTORY_RECORD_SIZE, 4);
+  writeUInt64LE(zip64EocdrBuffer, ZIP64_END_OF_CENTRAL_DIRECTORY_RECORD_SIZE - 12, 4);
   // version made by                                                                2 bytes
   zip64EocdrBuffer.writeUInt16LE(VERSION_MADE_BY, 12);
   // version needed to extract                                                      2 bytes
