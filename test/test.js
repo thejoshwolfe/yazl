@@ -37,23 +37,38 @@ var BufferList = require("bl");
 })();
 
 (function() {
-  var fileMetadata = {
-    mtime: new Date(),
-    mode: 0100664,
-    compress: false,
-  };
-  var zipfile = new yazl.ZipFile();
-  zipfile.addFile(__filename, "asdf.txt", {compress: false});
-  zipfile.addFile(__filename, "fdsa.txt", {compress: false});
-  zipfile.addBuffer(new Buffer("buffer"), "buffer.txt", fileMetadata);
-  fileMetadata.size = "stream".length;
-  zipfile.addReadStream(new BufferList().append("stream"), "stream.txt", fileMetadata);
-  zipfile.end(function(finalSize) {
-    if (finalSize === -1) throw new Error("finalSize should be known");
-    zipfile.outputStream.pipe(new BufferList(function(err, data) {
-      if (data.length !== finalSize) throw new Error("finalSize prediction is wrong. " + finalSize + " !== " + data.length);
-      console.log("finalSize: pass");
-    }));
+  var zip64Combinations = [
+    [0, 0, 0, 0, 0],
+    [1, 1, 0, 0, 0],
+    [0, 0, 1, 0, 0],
+    [0, 0, 0, 1, 0],
+    [0, 0, 0, 0, 1],
+    [1, 1, 1, 1, 1],
+  ];
+  zip64Combinations.forEach(function(zip64Config) {
+    var options = {
+      compress: false,
+      size: null,
+      forceZip64Format: false,
+    };
+    var zipfile = new yazl.ZipFile();
+    options.forceZip64Format = !!zip64Config[0];
+    zipfile.addFile(__filename, "asdf.txt", options);
+    options.forceZip64Format = !!zip64Config[1];
+    zipfile.addFile(__filename, "fdsa.txt", options);
+    options.forceZip64Format = !!zip64Config[2];
+    zipfile.addBuffer(new Buffer("buffer"), "buffer.txt", options);
+    options.forceZip64Format = !!zip64Config[3];
+    options.size = "stream".length;
+    zipfile.addReadStream(new BufferList().append("stream"), "stream.txt", options);
+    options.size = null;
+    zipfile.end({forceZip64Format:!!zip64Config[4]}, function(finalSize) {
+      if (finalSize === -1) throw new Error("finalSize should be known");
+      zipfile.outputStream.pipe(new BufferList(function(err, data) {
+        if (data.length !== finalSize) throw new Error("finalSize prediction is wrong. " + finalSize + " !== " + data.length);
+        console.log("finalSize(" + zip64Config.join("") + "): pass");
+      }));
+    });
   });
 })();
 
