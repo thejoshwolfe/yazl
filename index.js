@@ -231,9 +231,17 @@ function calculateFinalSize(self) {
       centralDirectorySize += ZIP64_EXTENDED_INFORMATION_EXTRA_FIELD_SIZE;
     }
   }
-  // just get the size of the eocdr and friends
-  centralDirectorySize += getEndOfCentralDirectoryRecord(self, true);
-  return pretendOutputCursor + centralDirectorySize;
+
+  var endOfCentralDirectorySize = 0;
+  if (self.forceZip64Eocd ||
+      self.entries.length >= 0xffff ||
+      centralDirectorySize >= 0xffff ||
+      pretendOutputCursor >= 0xffffffff) {
+    // use zip64 end of central directory stuff
+    endOfCentralDirectorySize += ZIP64_END_OF_CENTRAL_DIRECTORY_RECORD_SIZE + ZIP64_END_OF_CENTRAL_DIRECTORY_LOCATOR_SIZE;
+  }
+  endOfCentralDirectorySize += END_OF_CENTRAL_DIRECTORY_RECORD_SIZE;
+  return pretendOutputCursor + centralDirectorySize + endOfCentralDirectorySize;
 }
 
 var ZIP64_END_OF_CENTRAL_DIRECTORY_RECORD_SIZE = 56;
