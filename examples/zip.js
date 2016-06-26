@@ -9,7 +9,7 @@ var yazl = require("../");
 var fs = require("fs");
 
 var zipfile = new yazl.ZipFile();
-var options = {compress: false, zip64: false};
+var options = {compress: false, forceZip64Format: false};
 var use_buffer = false;
 
 var args = process.argv.slice(2);
@@ -34,11 +34,11 @@ args.forEach(function(arg) {
   } else if (arg === "--buffer") {
     use_buffer = true;
   } else if (arg === "--zip64=true") {
-    options.zip64 = true;
+    options.forceZip64Format = true;
   } else if (arg === "--zip64=false") {
-    options.zip64 = false;
+    options.forceZip64Format = false;
   } else if (arg === "--zip64=auto") {
-    options.zip64 = "auto";
+    options.forceZip64Format = "auto";
   } else if (arg === "--no-buffer") {
     use_buffer = false;
   } else if (arg === "-o") {
@@ -61,4 +61,4 @@ args.forEach(function(arg) {
     }
   }
 });
-zipfile.end({zip64: options.zip64});
+zipfile.end({forceZip64Format: options.forceZip64Format});

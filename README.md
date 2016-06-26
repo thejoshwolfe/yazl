@@ -68,7 +68,7 @@ File paths must not end with `"/"`.
   mtime: stats.mtime,
   mode: stats.mode,
   compress: true,
-  zip64: false,
+  forceZip64Format: false,
 }
 ```
 
@@ -82,15 +82,9 @@ yazl does not store group and user ids in the zip file.
 If `compress` is `true`, the file data will be deflated (compression method 8).
 If `compress` is `false`, the file data will be stored (compression method 0).
 
-If `zip64` is `false` (or omitted or null), this zipfile will emit an error
-if this archive would require ZIP64 format, assuming this is the last entry.
-If `zip64` is `true`, yazl will use ZIP64 format in this entry's local file header
-and/or data descriptor regardless of if it's required or not (this may be useful for testing.).
-If `zip64` is `"auto"`, yazl will use ZIP64 format in this entry's local file header
-and/or data descriptor if it is required.
-
-regardless of whether it is actually required.
-This option really only exists for the purpose of easy testing of ZIP64 support.
+If `forceZip64Format` is `true`, yazl will use ZIP64 format in this entry's Data Descriptor
+and Central Directory Record regardless of if it's required or not (this may be useful for testing.).
+Otherwise, yazl will use ZIP64 format where necessary.
 
 Internally, `fs.stat()` is called immediately in the `addFile` function,
 and `fs.createReadStream()` is used later when the file data is actually required.
@@ -108,12 +102,12 @@ See `addFile()` for info about the `metadataPath` parameter.
   mtime: new Date(),
   mode: 0100664,
   compress: true,
-  zip64: false,
+  forceZip64Format: false,
   size: 12345, // example value
 }
 ```
 
-See `addFile()` for the meaning of `mtime`, `mode`, `compress`, and `zip64`.
+See `addFile()` for the meaning of `mtime`, `mode`, `compress`, and `forceZip64Format`.
 If `size` is given, it will be checked against the actual number of bytes in the `readStream`,
 and an error will be emitted if there is a mismatch.
 
@@ -123,6 +117,7 @@ In certain versions of node, `.on('data')` makes `.pipe()` behave incorrectly.
 #### addBuffer(buffer, metadataPath, [options])
 
 Adds a file to the zip file whose content is `buffer`.
+See below for info on the limitations on the size of `buffer`.
 See `addFile()` for info about the `metadataPath` parameter.
 `options` may be omitted or null and has the following structure and default values:
 
@@ -131,11 +126,11 @@ See `addFile()` for info about the `metadataPath` parameter.
   mtime: new Date(),
   mode: 0100664,
   compress: true,
-  zip64: false,
+  forceZip64Format: false,
 }
 ```
 
-See `addFile()` for the meaning of `mtime`, `mode`, `compress`, and `zip64`.
+See `addFile()` for the meaning of `mtime`, `mode`, `compress`, and `forceZip64Format`.
 
 This method has the unique property that General Purpose Bit `3` will not be used in the Local File Header.
 This doesn't matter for unzip implementations that conform to the Zip File Spec.
@@ -145,6 +140,24 @@ See [issue #11](https://github.com/thejoshwolfe/yazl/issues/11).
 If you would like to create zip files that 7-Zip 9.20 can understand,
 you must use `addBuffer()` instead of `addFile()` or `addReadStream()` for all entries in the zip file
 (and `addEmptyDirectory()` is fine too).
+
+Note that even when yazl provides the file sizes in the Local File Header,
+yazl never uses ZIP64 format for Local File Headers due to the size limit on `buffer` (see below).
+
+##### Size limitation on buffer
+
+In order to require the ZIP64 format for a local file header,
+the provided `buffer` parameter would need to exceed `0xfffffffe` in length.
+Alternatively, the `buffer` parameter might not exceed `0xfffffffe` in length,
+but zlib compression fails to compress the buffer and actually inflates the data to more than `0xfffffffe` in length.
+Both of these scenarios are not allowed by yazl, and those are enforced by a size limit on the `buffer` parameter.
+
+According to [this zlib documentation](http://www.zlib.net/zlib_tech.html),
+the worst case compression results in "an expansion of at most 13.5%, plus eleven bytes".
+Furthermore, some configurations of Node.js impose a size limit of `0x3fffffff` on every `Buffer` object.
+Running this size through the worst case compression of zlib still produces a size less than `0xfffffffe` bytes,
+
+Therefore, yazl enforces that the provided `buffer` parameter must be at most `0x3fffffff` bytes long.
 
 #### addEmptyDirectory(metadataPath, [options])
 
@@ -177,14 +190,14 @@ to listen to the `end` event on the `outputStream` before notifying consumers of
 
 ```js
 {
-  zip64: "auto",
+  forceZip64Format: false,
 }
 ```
 
-If `zip64` is `false`, yazl will emit an error if ZIP64 format is required in the central directory.
-If `zip64` is `"auto"` (or omitted or null), yazl will use ZIP64 format in the central directory if necessary.
-If `zip64` is `true`, yazl will use ZIP64 format in the central directory regardless of whether or not it is required.
-(The value `true` can be useful for testing.)
+If `forceZip64Format` is `true`, yazl will include the ZIP64 End of Central Directory Locator
+and ZIP64 End of Central Directory Record regardless of whether or not they are required
+(this may be useful for testing.).
+Otherwise, yazl will include these structures if necessary.
 
 If specified and non-null, `finalSizeCallback` is given the parameters `(finalSize)`
 sometime during or after the call to `end()`.
@@ -195,7 +208,7 @@ If `finalSize` is `-1`, it means means the final size is too hard to guess befor
 This will happen if and only if the `compress` option is `true` on any call to `addFile()`, `addReadStream()`, or `addBuffer()`,
 or if `addReadStream()` is called and the optional `size` option is not given.
 In other words, clients should know whether they're going to get a `-1` or a real value
-by looking at how they are calling this function.
+by looking at how they are using this library.
 
 The call to `finalSizeCallback` might be delayed if yazl is still waiting for `fs.Stats` for an `addFile()` entry.
 If `addFile()` was never called, `finalSizeCallback` will be called during the call to `end()`.
@@ -222,6 +235,17 @@ In certain versions of node, you cannot use both `.on('data')` and `.pipe()` suc
 `jsDate` is a `Date` instance.
 Returns `{date: date, time: time}`, where `date` and `time` are unsigned 16-bit integers.
 
+## Regarding ZIP64 Support
+
+yazl automatically uses ZIP64 format to support files and archives over `2^32 - 2` bytes (~4GB) in size
+and to support archives with more than `2^16 - 2` (65534) files.
+(See the `forceZip64Format` option in the API above for more control over this behavior.)
+ZIP64 format is necessary to exceed the limits inherent in the original zip file format.
+
+ZIP64 format is supported by most popular zipfile readers, but not by all of them.
+Notably, the Mac Archive Utility does not understand ZIP64 format (as of writing this),
+and will behave very strangely when presented with such an archive.
+
 ## Output Structure
 
 The Zip File Spec leaves a lot of flexibility up to the zip file creator.
@@ -234,17 +258,15 @@ but may be interesting to unzip implementors and zip file enthusiasts.
 
 All values related to disk numbers are `0`,
 because yazl has no multi-disk archive support.
+(The exception being the Total Number of Disks field in
+the ZIP64 End of Central Directory Locator, which is always `1`.)
 
 ### Version Made By
 
-Always `0x031e`.
-This is the value reported by a Linux build of Info-Zip.
-Instead of experimenting with different values of this field
-to see how different unzip clients would behave,
-yazl mimics Info-Zip, which should work everywhere.
+Always `0x033f == (3 << 8) | 63`, which means UNIX (3)
+and made from the spec version 6.3 (63).
 
-Note that the top byte means "UNIX"
-and has implications in the External File Attributes.
+Note that the "UNIX" and has implications in the External File Attributes.
 
 ### Version Needed to Extract
 
@@ -264,9 +286,9 @@ But remember a complete metadata listing is still always available in the centra
 so if unzip implementations are relying on that, like they should,
 none of this paragraph will matter anyway.
 Even so, some popular unzip implementations do not follow the spec.
-Mac's Archive Utility requires Data Descriptors to include the optional signature,
+The Mac Archive Utility requires Data Descriptors to include the optional signature,
 so yazl includes the optional data descriptor signature.
-When bit `3` is not used, Mac's Archive Utility requires there to be no data descriptor, so yazl skips it in that case.
+When bit `3` is not used, the Mac Archive Utility requires there to be no data descriptor, so yazl skips it in that case.
 Additionally, 7-Zip 9.20 does not seem to support bit `3` at all
 (see [issue #11](https://github.com/thejoshwolfe/yazl/issues/11)).
 

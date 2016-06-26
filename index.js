@@ -16,7 +16,7 @@ function ZipFile() {
   this.outputStreamCursor = 0;
   this.ended = false; // .end() sets this
   this.allDone = false; // set when we've written the last bytes
-  this.zip64 = null;
+  this.forceZip64Eocd = false; // configurable in .end()
 }
 
 ZipFile.prototype.addFile = function(realPath, metadataPath, options) {
@@ -60,6 +60,7 @@ ZipFile.prototype.addReadStream = function(readStream, metadataPath, options) {
 ZipFile.prototype.addBuffer = function(buffer, metadataPath, options) {
   var self = this;
   metadataPath = validateMetadataPath(metadataPath, false);
+  if (buffer.length > 0x3fffffff) throw new Error("buffer too large: " + buffer.length + " > " + 0x3fffffff);
   if (options == null) options = {};
   if (options.size != null) throw new Error("options.size not allowed");
   var entry = new Entry(metadataPath, false, options);
@@ -116,7 +117,7 @@ ZipFile.prototype.end = function(options, finalSizeCallback) {
   if (this.ended) return;
   this.ended = true;
   this.finalSizeCallback = finalSizeCallback;
-  this.zip64 = options.zip64;
+  this.forceZip64Eocd = !!options.forceZip64Format;
   pumpEntries(this);
 };
 
@@ -197,7 +198,8 @@ function pumpEntries(self) {
 }
 
 function calculateFinalSize(self) {
-  var result = 0;
+  var pretendOutputCursor = 0;
+  var centralDirectorySize = 0;
   for (var i = 0; i < self.entries.length; i++) {
     var entry = self.entries[i];
     // compression is too hard to predict
@@ -209,21 +211,29 @@ function calculateFinalSize(self) {
       // if we're still waiting for fs.stat, we might learn the size someday
       if (entry.uncompressedSize == null) return null;
     }
-    result += LOCAL_FILE_HEADER_FIXED_SIZE + entry.utf8FileName.length +
-              entry.uncompressedSize +
-              // then the data descriptor; see below.
-              CENTRAL_DIRECTORY_RECORD_FIXED_SIZE + entry.utf8FileName.length;
+    // we know this for sure, and this is important to know if we need ZIP64 format.
+    entry.relativeOffsetOfLocalHeader = pretendOutputCursor;
+    var useZip64Format = entry.useZip64Format();
+
+    pretendOutputCursor += LOCAL_FILE_HEADER_FIXED_SIZE + entry.utf8FileName.length;
+    pretendOutputCursor += entry.uncompressedSize;
     if (!entry.crcAndFileSizeKnown) {
-      if (entry.zip64 === true) {
-        result += DATA_DESCRIPTOR_SIZE;
+      // use a data descriptor
+      if (useZip64Format) {
+        pretendOutputCursor += ZIP64_DATA_DESCRIPTOR_SIZE;
       } else {
-        result += ZIP64_DATA_DESCRIPTOR_SIZE;
+        pretendOutputCursor += DATA_DESCRIPTOR_SIZE;
       }
+    }
+
+    centralDirectorySize += CENTRAL_DIRECTORY_RECORD_FIXED_SIZE + entry.utf8FileName.length;
+    if (useZip64Format) {
+      centralDirectorySize += ZIP64_EXTENDED_INFORMATION_EXTRA_FIELD_SIZE;
     }
   }
   // just get the size of the eocdr and friends
-  result += getEndOfCentralDirectoryRecord(self, true);
-  return result;
+  centralDirectorySize += getEndOfCentralDirectoryRecord(self, true);
+  return pretendOutputCursor + centralDirectorySize;
 }
 
 var ZIP64_END_OF_CENTRAL_DIRECTORY_RECORD_SIZE = 56;
@@ -232,18 +242,18 @@ var END_OF_CENTRAL_DIRECTORY_RECORD_SIZE = 22;
 function getEndOfCentralDirectoryRecord(self, actuallyJustTellMeHowLongItWouldBe) {
   var needZip64Format = false;
   var normalEntriesLength = self.entries.length;
-  if (self.zip64 === true || self.entries.length >= 0xffff) {
+  if (self.forceZip64Eocd || self.entries.length >= 0xffff) {
     normalEntriesLength = 0xffff;
     needZip64Format = true;
   }
   var sizeOfCentralDirectory = self.outputStreamCursor - self.offsetOfStartOfCentralDirectory;
   var normalSizeOfCentralDirectory = sizeOfCentralDirectory;
-  if (self.zip64 === true || sizeOfCentralDirectory >= 0xffffffff) {
+  if (self.forceZip64Eocd || sizeOfCentralDirectory >= 0xffffffff) {
     normalSizeOfCentralDirectory = 0xffffffff;
     needZip64Format = true;
   }
   var normalOffsetOfStartOfCentralDirectory = self.offsetOfStartOfCentralDirectory;
-  if (self.zip64 === true || self.offsetOfStartOfCentralDirectory >= 0xffffffff) {
+  if (self.forceZip64Eocd || self.offsetOfStartOfCentralDirectory >= 0xffffffff) {
     normalOffsetOfStartOfCentralDirectory = 0xffffffff;
     needZip64Format = true;
   }
@@ -373,7 +383,7 @@ function Entry(metadataPath, isDirectory, options) {
     this.compress = true; // default
     if (options.compress != null) this.compress = !!options.compress;
   }
-  this.zip64 = options.zip64;
+  this.forceZip64Format = !!options.forceZip64Format;
 }
 Entry.WAITING_FOR_METADATA = 0;
 Entry.READY_TO_PUMP_FILE_DATA = 1;
@@ -394,6 +404,14 @@ Entry.prototype.setFileDataPumpFunction = function(doFileDataPump) {
   this.doFileDataPump = doFileDataPump;
   this.state = Entry.READY_TO_PUMP_FILE_DATA;
 };
+Entry.prototype.useZip64Format = function() {
+  return (
+    (this.forceZip64Format) ||
+    (this.uncompressedSize != null && this.uncompressedSize > 0xfffffffe) ||
+    (this.compressedSize != null && this.compressedSize > 0xfffffffe) ||
+    (this.relativeOffsetOfLocalHeader != null && this.relativeOffsetOfLocalHeader > 0xfffffffe)
+  );
+}
 var LOCAL_FILE_HEADER_FIXED_SIZE = 30;
 // this version enables zip64
 var VERSION_NEEDED_TO_EXTRACT = 45;
@@ -448,18 +466,11 @@ Entry.prototype.getLocalFileHeader = function() {
 var DATA_DESCRIPTOR_SIZE = 16;
 var ZIP64_DATA_DESCRIPTOR_SIZE = 24;
 Entry.prototype.getDataDescriptor = function() {
-  if (this.compressedSize   >= 0xffffffff ||
-      this.uncompressedSize >= 0xffffffff) {
-    if (this.zip64 === false) {
-      // TODO: this is supposed to be an error
-    }
-    this.zip64 = true;
-  }
   if (this.crcAndFileSizeKnown) {
-    // MAC's Archive Utility requires this not be present unless we set general purpose bit 3
+    // the Mac Archive Utility requires this not be present unless we set general purpose bit 3
     return new Buffer(0);
   }
-  if (this.zip64 !== true) {
+  if (!this.useZip64Format()) {
     var buffer = new Buffer(DATA_DESCRIPTOR_SIZE);
     // optional signature (required according to Archive Utility)
     buffer.writeUInt32LE(0x08074b50, 0);
@@ -494,16 +505,8 @@ Entry.prototype.getCentralDirectoryRecord = function() {
   var normalCompressedSize = this.compressedSize;
   var normalUncompressedSize = this.uncompressedSize;
   var normalRelativeOffsetOfLocalHeader = this.relativeOffsetOfLocalHeader;
-  if (normalCompressedSize              >= 0xffffffff ||
-      normalUncompressedSize            >= 0xffffffff ||
-      normalRelativeOffsetOfLocalHeader >= 0xffffffff) {
-    if (this.zip64 === false) {
-      // TODO: this is supposed to be an error
-    }
-    this.zip64 = true;
-  }
   var zeiefBuffer;
-  if (this.zip64 === true) {
+  if (this.useZip64Format()) {
     normalCompressedSize = 0xffffffff;
     normalUncompressedSize = 0xffffffff;
     normalRelativeOffsetOfLocalHeader = 0xffffffff;
