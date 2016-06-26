@@ -322,6 +322,8 @@ In order to create empty directories, use `addEmptyDirectory()`.
 
 ## Change History
 
+ * 2.4.0
+   * Add ZIP64 support. [issue #6](https://github.com/thejoshwolfe/yazl/issues/6)
  * 2.3.1
    * Remove `.npmignore` from npm package. [pull #22](https://github.com/thejoshwolfe/yazl/pull/22)
  * 2.3.0
