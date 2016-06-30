@@ -309,7 +309,7 @@ function getEndOfCentralDirectoryRecord(self, actuallyJustTellMeHowLongItWouldBe
   // version made by                                                                2 bytes
   zip64EocdrBuffer.writeUInt16LE(VERSION_MADE_BY, 12);
   // version needed to extract                                                      2 bytes
-  zip64EocdrBuffer.writeUInt16LE(VERSION_NEEDED_TO_EXTRACT, 14);
+  zip64EocdrBuffer.writeUInt16LE(VERSION_NEEDED_TO_EXTRACT_ZIP64, 14);
   // number of this disk                                                            4 bytes
   zip64EocdrBuffer.writeUInt32LE(0, 16);
   // number of the disk with the start of the central directory                     4 bytes
@@ -421,8 +421,8 @@ Entry.prototype.useZip64Format = function() {
   );
 }
 var LOCAL_FILE_HEADER_FIXED_SIZE = 30;
-// this version enables zip64
-var VERSION_NEEDED_TO_EXTRACT = 45;
+var VERSION_NEEDED_TO_EXTRACT_UTF8 = 20;
+var VERSION_NEEDED_TO_EXTRACT_ZIP64 = 45;
 // 3 = unix. 63 = spec version 6.3
 var VERSION_MADE_BY = (3 << 8) | 63;
 var FILE_NAME_IS_UTF8 = 1 << 11;
@@ -444,7 +444,7 @@ Entry.prototype.getLocalFileHeader = function() {
   // local file header signature     4 bytes  (0x04034b50)
   fixedSizeStuff.writeUInt32LE(0x04034b50, 0);
   // version needed to extract       2 bytes
-  fixedSizeStuff.writeUInt16LE(VERSION_NEEDED_TO_EXTRACT, 4);
+  fixedSizeStuff.writeUInt16LE(VERSION_NEEDED_TO_EXTRACT_UTF8, 4);
   // general purpose bit flag        2 bytes
   fixedSizeStuff.writeUInt16LE(generalPurposeBitFlag, 6);
   // compression method              2 bytes
@@ -513,11 +513,13 @@ Entry.prototype.getCentralDirectoryRecord = function() {
   var normalCompressedSize = this.compressedSize;
   var normalUncompressedSize = this.uncompressedSize;
   var normalRelativeOffsetOfLocalHeader = this.relativeOffsetOfLocalHeader;
+  var versionNeededToExtract;
   var zeiefBuffer;
   if (this.useZip64Format()) {
     normalCompressedSize = 0xffffffff;
     normalUncompressedSize = 0xffffffff;
     normalRelativeOffsetOfLocalHeader = 0xffffffff;
+    versionNeededToExtract = VERSION_NEEDED_TO_EXTRACT_ZIP64;
 
     // ZIP64 extended information extra field
     zeiefBuffer = new Buffer(ZIP64_EXTENDED_INFORMATION_EXTRA_FIELD_SIZE);
@@ -534,6 +536,7 @@ Entry.prototype.getCentralDirectoryRecord = function() {
     // Disk Start Number       4 bytes    Number of the disk on which this file starts
     // (omit)
   } else {
+    versionNeededToExtract = VERSION_NEEDED_TO_EXTRACT_UTF8;
     zeiefBuffer = new Buffer(0);
   }
 
@@ -542,7 +545,7 @@ Entry.prototype.getCentralDirectoryRecord = function() {
   // version made by                 2 bytes
   fixedSizeStuff.writeUInt16LE(VERSION_MADE_BY, 4);
   // version needed to extract       2 bytes
-  fixedSizeStuff.writeUInt16LE(VERSION_NEEDED_TO_EXTRACT, 6);
+  fixedSizeStuff.writeUInt16LE(versionNeededToExtract, 6);
   // general purpose bit flag        2 bytes
   fixedSizeStuff.writeUInt16LE(generalPurposeBitFlag, 8);
   // compression method              2 bytes
