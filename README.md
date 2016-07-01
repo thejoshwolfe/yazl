@@ -270,8 +270,10 @@ Note that the "UNIX" and has implications in the External File Attributes.
 
 ### Version Needed to Extract
 
-Always `45`, meaning 4.5.
-This enables the ZIP64 format.
+Usually `20`, meaning 2.0. This allows filenames to be UTF-8 encoded.
+
+When ZIP64 format is used, some of the Version Needed to Extract values will be `45`, meaning 4.5.
+When this happens, there may be a mix of `20` and `45` values throughout the zipfile.
 
 ### General Purpose Bit Flag
 
