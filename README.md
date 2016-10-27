@@ -29,11 +29,11 @@ zipfile.outputStream.pipe(fs.createWriteStream("output.zip")).on("close", functi
 // alternate apis for adding files:
 zipfile.addReadStream(process.stdin, "stdin.txt", {
   mtime: new Date(),
-  mode: 0100664, // -rw-rw-r--
+  mode: parseInt("0100664", 8), // -rw-rw-r--
 });
 zipfile.addBuffer(new Buffer("hello"), "hello.txt", {
   mtime: new Date(),
-  mode: 0100664, // -rw-rw-r--
+  mode: parseInt("0100664", 8), // -rw-rw-r--
 });
 // call end() after all the files have been added
 zipfile.end();
@@ -324,6 +324,8 @@ In order to create empty directories, use `addEmptyDirectory()`.
 
 ## Change History
 
+ * 2.4.2
+   * Remove octal literals to make yazl compatible with strict mode. [pull #28](https://github.com/thejoshwolfe/yazl/pull/28)
  * 2.4.1
    * Fix Mac Archive Utility compatibility issue. [issue #24](https://github.com/thejoshwolfe/yazl/issues/24)
  * 2.4.0
