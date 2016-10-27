@@ -100,7 +100,7 @@ See `addFile()` for info about the `metadataPath` parameter.
 ```js
 {
   mtime: new Date(),
-  mode: 0100664,
+  mode: parseInt("0100664", 8),
   compress: true,
   forceZip64Format: false,
   size: 12345, // example value
@@ -124,7 +124,7 @@ See `addFile()` for info about the `metadataPath` parameter.
 ```js
 {
   mtime: new Date(),
-  mode: 0100664,
+  mode: parseInt("0100664", 8),
   compress: true,
   forceZip64Format: false,
 }
