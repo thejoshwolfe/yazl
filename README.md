@@ -184,7 +184,7 @@ See `addFile()` for the meaning of `mtime` and `mode`.
 Indicates that no more files will be added via `addFile()`, `addReadStream()`, or `addBuffer()`.
 Some time after calling this function, `outputStream` will be ended. Note that this entails that you cannot rely on this
 callback to know when you are done producing output. If for instance you are creating a zip archive on disk, you will need
-to listen to the `end` event on the `outputStream` before notifying consumers of that file.
+to listen to the `finish` event on the `outputStream` before notifying consumers of that file.
 
 `options` may be omitted or null and has the following structure and default values:
 
