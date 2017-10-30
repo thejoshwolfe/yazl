@@ -324,6 +324,8 @@ In order to create empty directories, use `addEmptyDirectory()`.
 
 ## Change History
 
+ * 2.4.3
+   * Clarify readme. [pull #33](https://github.com/thejoshwolfe/yazl/pull/33)
  * 2.4.2
    * Remove octal literals to make yazl compatible with strict mode. [pull #28](https://github.com/thejoshwolfe/yazl/pull/28)
  * 2.4.1
