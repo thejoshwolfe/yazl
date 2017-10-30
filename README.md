@@ -182,9 +182,6 @@ See `addFile()` for the meaning of `mtime` and `mode`.
 #### end([options], [finalSizeCallback])
 
 Indicates that no more files will be added via `addFile()`, `addReadStream()`, or `addBuffer()`.
-Some time after calling this function, `outputStream` will be ended. Note that this entails that you cannot rely on this
-callback to know when you are done producing output. If for instance you are creating a zip archive on disk, you will need
-to listen to the `end` event on the `outputStream` before notifying consumers of that file.
 
 `options` may be omitted or null and has the following structure and default values:
 
@@ -203,6 +200,9 @@ If specified and non-null, `finalSizeCallback` is given the parameters `(finalSi
 sometime during or after the call to `end()`.
 `finalSize` is of type `Number` and can either be `-1`
 or the guaranteed eventual size in bytes of the output data that can be read from `outputStream`.
+
+Note that `finalSizeCallback` is usually called well before `outputStream` has piped all its data;
+this callback does not mean that the stream is done.
 
 If `finalSize` is `-1`, it means means the final size is too hard to guess before processing the input file data.
 This will happen if and only if the `compress` option is `true` on any call to `addFile()`, `addReadStream()`, or `addBuffer()`,
