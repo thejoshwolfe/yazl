@@ -44,6 +44,40 @@ ZipFile.prototype.addFile = function(realPath, metadataPath, options) {
   });
 };
 
+ZipFile.prototype.addSymlink = function(realPath, metadataPath, options) {
+  var self = this;
+  metadataPath = validateMetadataPath(metadataPath, false);
+  if (options == null) options = {};
+  if (options.mode == null) stats.mode = parseInt("10100000" + "11111101", 2);
+  
+  var entry = new Entry(metadataPath, false, options);
+  self.entries.push(entry);
+  fs.lstat(realPath, function(err, stats) {
+    if (err) return self.emit("error", err);
+    if (!stats.isSymbolicLink()) return self.emit("error", new Error("not a symbolic link: " + realPath));
+    entry.uncompressedSize = stats.size;
+    
+    if (options.mtime == null) entry.setLastModDate(stats.mtime);
+    entry.setFileDataPumpFunction(function() {
+      fs.readlink(realPath, { encoding: "utf8" }, function (err, linkString) {
+          if (err) return self.emit("error", err);
+          var compressedBuffer = Buffer.from(linkString);
+          writeToOutputStream(self, compressedBuffer);
+          writeToOutputStream(self, entry.getDataDescriptor());
+          entry.state = Entry.FILE_DATA_DONE;
+          entry.crc32 = crc32.unsigned(compressedBuffer);
+          
+          // don't call pumpEntries() recursively.
+          // (also, don't call process.nextTick recursively.)
+          setImmediate(function() {
+            pumpEntries(self);
+          });
+      });
+    });
+    pumpEntries(self);
+  });
+};
+
 ZipFile.prototype.addReadStream = function(readStream, metadataPath, options) {
   var self = this;
   metadataPath = validateMetadataPath(metadataPath, false);
@@ -405,11 +439,14 @@ Entry.prototype.setLastModDate = function(date) {
   this.lastModFileTime = dosDateTime.time;
   this.lastModFileDate = dosDateTime.date;
 };
-Entry.prototype.setFileAttributesMode = function(mode) {
+Entry.prototype.setFileAttributesMode = function(mode, type) {
   if ((mode & 0xffff) !== mode) throw new Error("invalid mode. expected: 0 <= " + mode + " <= " + 0xffff);
   // http://unix.stackexchange.com/questions/14705/the-zip-formats-external-file-attribute/14727#14727
+  
+  
   this.externalFileAttributes = (mode << 16) >>> 0;
 };
+
 // doFileDataPump() should not call pumpEntries() directly. see issue #9.
 Entry.prototype.setFileDataPumpFunction = function(doFileDataPump) {
   this.doFileDataPump = doFileDataPump;
