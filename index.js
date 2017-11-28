@@ -44,16 +44,25 @@ ZipFile.prototype.addFile = function(realPath, metadataPath, options) {
   });
 };
 
-ZipFile.prototype.addSymlink = function(realPath, metadataPath, options) {
+ZipFile.prototype.addSymlink = function(realPath, metadataPath, options, callback) {
   var self = this;
   fs.lstat(realPath, function(err, stats) {
+    if (err)
+      return callback(err);
+    if (!stats.isSymbolicLink())
+      return callback(new Error("\"" + readPath + "\" is not a symbolic link"));
     fs.readlink(realPath, { encoding: "utf8" }, function (err, linkString) {
+      if (err)
+        return callback(err);
       var buffer = Buffer.from(linkString);
-      var options = {
-        mode: stats.mode,
-        compress: false
-      };
+      if (!options) options = {};
+      if (!options.mode) options.mode = stats.mode;
+      else if (options.mode >>> 28 !== 10)
+        return new Error("\"" + options.mode + "\" gives the wrong entry type for a symbolic link");
+      if (!options.compress) options.compress = false;
+      
       self.addBuffer(buffer, metadataPath, options);
+      callback();
     })
   });
 };
