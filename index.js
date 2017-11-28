@@ -419,14 +419,11 @@ Entry.prototype.setLastModDate = function(date) {
   this.lastModFileTime = dosDateTime.time;
   this.lastModFileDate = dosDateTime.date;
 };
-Entry.prototype.setFileAttributesMode = function(mode, type) {
+Entry.prototype.setFileAttributesMode = function(mode) {
   if ((mode & 0xffff) !== mode) throw new Error("invalid mode. expected: 0 <= " + mode + " <= " + 0xffff);
   // http://unix.stackexchange.com/questions/14705/the-zip-formats-external-file-attribute/14727#14727
-  
-  
   this.externalFileAttributes = (mode << 16) >>> 0;
 };
-
 // doFileDataPump() should not call pumpEntries() directly. see issue #9.
 Entry.prototype.setFileDataPumpFunction = function(doFileDataPump) {
   this.doFileDataPump = doFileDataPump;
