@@ -46,35 +46,15 @@ ZipFile.prototype.addFile = function(realPath, metadataPath, options) {
 
 ZipFile.prototype.addSymlink = function(realPath, metadataPath, options) {
   var self = this;
-  metadataPath = validateMetadataPath(metadataPath, false);
-  if (options == null) options = {};
-  if (options.mode == null) stats.mode = parseInt("10100000" + "11111101", 2);
-  
-  var entry = new Entry(metadataPath, false, options);
-  self.entries.push(entry);
   fs.lstat(realPath, function(err, stats) {
-    if (err) return self.emit("error", err);
-    if (!stats.isSymbolicLink()) return self.emit("error", new Error("not a symbolic link: " + realPath));
-    entry.uncompressedSize = stats.size;
-    
-    if (options.mtime == null) entry.setLastModDate(stats.mtime);
-    entry.setFileDataPumpFunction(function() {
-      fs.readlink(realPath, { encoding: "utf8" }, function (err, linkString) {
-          if (err) return self.emit("error", err);
-          var compressedBuffer = Buffer.from(linkString);
-          writeToOutputStream(self, compressedBuffer);
-          writeToOutputStream(self, entry.getDataDescriptor());
-          entry.state = Entry.FILE_DATA_DONE;
-          entry.crc32 = crc32.unsigned(compressedBuffer);
-          
-          // don't call pumpEntries() recursively.
-          // (also, don't call process.nextTick recursively.)
-          setImmediate(function() {
-            pumpEntries(self);
-          });
-      });
-    });
-    pumpEntries(self);
+    fs.readlink(realPath, { encoding: "utf8" }, function (err, linkString) {
+      var buffer = Buffer.from(linkString);
+      var options = {
+        mode: stats.mode,
+        compress: false
+      };
+      self.addBuffer(buffer, metadataPath, options);
+    })
   });
 };
 
