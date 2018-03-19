@@ -26,6 +26,7 @@
     "buffer-crc32": "~0.2.3"
   },
   "devDependencies": {
+    "@types/node": "*",
     "bl": "~0.9.3",
     "yauzl": "~2.3.1"
   },
