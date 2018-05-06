@@ -277,7 +277,7 @@ When this happens, there may be a mix of `20` and `45` values throughout the zip
 
 ### General Purpose Bit Flag
 
-Bit `8` is always set.
+Bit `11` is always set.
 Filenames are always encoded in utf8, even if the result is indistinguishable from ascii.
 
 Bit `3` is usually set in the Local File Header.
