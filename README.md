@@ -182,6 +182,7 @@ See `addFile()` for the meaning of `mtime` and `mode`.
 #### end([options], [finalSizeCallback])
 
 Indicates that no more files will be added via `addFile()`, `addReadStream()`, or `addBuffer()`.
+This method must be called to properly close `outputStream`.
 
 `options` may be omitted or null and has the following structure and default values:
 
