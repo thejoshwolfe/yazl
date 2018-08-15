@@ -181,7 +181,8 @@ See `addFile()` for the meaning of `mtime` and `mode`.
 
 #### end([options], [finalSizeCallback])
 
-Indicates that no more files will be added via `addFile()`, `addReadStream()`, or `addBuffer()`.
+Indicates that no more files will be added via `addFile()`, `addReadStream()`, or `addBuffer()`,
+and causes the eventual close of `outputStream`.
 
 `options` may be omitted or null and has the following structure and default values:
 
@@ -227,6 +228,8 @@ Data becomes available in this stream soon after calling one of `addFile()`, `ad
 Clients can call `pipe()` on this stream at any time,
 such as immediately after getting a new `ZipFile` instance, or long after calling `end()`.
 
+This stream will remain open while you add entries until you `end()` the zip file.
+
 As a reminder, be careful using both `.on('data')` and `.pipe()` with this stream.
 In certain versions of node, you cannot use both `.on('data')` and `.pipe()` successfully.
 
@@ -266,7 +269,7 @@ the ZIP64 End of Central Directory Locator, which is always `1`.)
 Always `0x033f == (3 << 8) | 63`, which means UNIX (3)
 and made from the spec version 6.3 (63).
 
-Note that the "UNIX" and has implications in the External File Attributes.
+Note that the "UNIX" has implications in the External File Attributes.
 
 ### Version Needed to Extract
 
