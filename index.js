@@ -360,9 +360,6 @@ function validateMetadataPath(metadataPath, isDirectory) {
   return metadataPath;
 }
 
-var defaultFileMode = 0o0100664;
-var defaultDirectoryMode = 0o040775;
-
 // this class is not part of the public API
 function Entry(metadataPath, isDirectory, options) {
   this.utf8FileName = new Buffer(metadataPath);
@@ -373,7 +370,7 @@ function Entry(metadataPath, isDirectory, options) {
   if (options.mode != null) {
     this.setFileAttributesMode(options.mode);
   } else {
-    this.setFileAttributesMode(isDirectory ? defaultDirectoryMode : defaultFileMode);
+    this.setFileAttributesMode(isDirectory ? 0o40775 : 0o100664);
   }
   if (isDirectory) {
     this.crcAndFileSizeKnown = true;

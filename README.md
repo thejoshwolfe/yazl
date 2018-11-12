@@ -29,11 +29,11 @@ zipfile.outputStream.pipe(fs.createWriteStream("output.zip")).on("close", functi
 // alternate apis for adding files:
 zipfile.addReadStream(process.stdin, "stdin.txt", {
   mtime: new Date(),
-  mode: 0o0100664, // -rw-rw-r--
+  mode: 0o100664, // -rw-rw-r--
 });
 zipfile.addBuffer(new Buffer("hello"), "hello.txt", {
   mtime: new Date(),
-  mode: 0o0100664, // -rw-rw-r--
+  mode: 0o100664, // -rw-rw-r--
 });
 // call end() after all the files have been added
 zipfile.end();
@@ -100,7 +100,7 @@ See `addFile()` for info about the `metadataPath` parameter.
 ```js
 {
   mtime: new Date(),
-  mode: 0o0100664,
+  mode: 0o100664,
   compress: true,
   forceZip64Format: false,
   size: 12345, // example value
@@ -124,7 +124,7 @@ See `addFile()` for info about the `metadataPath` parameter.
 ```js
 {
   mtime: new Date(),
-  mode: 0o0100664,
+  mode: 0o100664,
   compress: true,
   forceZip64Format: false,
 }
