@@ -360,8 +360,8 @@ function validateMetadataPath(metadataPath, isDirectory) {
   return metadataPath;
 }
 
-var defaultFileMode = parseInt("0100664", 8);
-var defaultDirectoryMode = parseInt("040775", 8);
+var defaultFileMode = 0o0100664;
+var defaultDirectoryMode = 0o040775;
 
 // this class is not part of the public API
 function Entry(metadataPath, isDirectory, options) {
