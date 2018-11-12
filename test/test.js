@@ -130,8 +130,9 @@ var BufferList = require("bl");
 (function() {
   var zipfile = new yazl.ZipFile();
   var comment = "Hello World";
-  zipfile.comment = comment;
-  zipfile.end(function(finalSize) {
+  zipfile.end({
+    comment: comment
+  }, function(finalSize) {
     if (finalSize === -1) throw new Error("finalSize should be known");
     zipfile.outputStream.pipe(new BufferList(function(err, data) {
       if (err) throw err;

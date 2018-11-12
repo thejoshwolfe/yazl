@@ -191,6 +191,7 @@ and causes the eventual close of `outputStream`.
 
 ```js
 {
+  comment: "",
   forceZip64Format: false,
 }
 ```

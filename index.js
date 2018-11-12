@@ -17,7 +17,6 @@ function ZipFile() {
   this.ended = false; // .end() sets this
   this.allDone = false; // set when we've written the last bytes
   this.forceZip64Eocd = false; // configurable in .end()
-  this.comment = "";
 }
 
 ZipFile.prototype.addFile = function(realPath, metadataPath, options) {
@@ -119,6 +118,7 @@ ZipFile.prototype.end = function(options, finalSizeCallback) {
   this.ended = true;
   this.finalSizeCallback = finalSizeCallback;
   this.forceZip64Eocd = !!options.forceZip64Format;
+  this.comment = Buffer.from(options.comment || "", "utf-8");
   pumpEntries(this);
 };
 
@@ -241,7 +241,7 @@ function calculateFinalSize(self) {
     // use zip64 end of central directory stuff
     endOfCentralDirectorySize += ZIP64_END_OF_CENTRAL_DIRECTORY_RECORD_SIZE + ZIP64_END_OF_CENTRAL_DIRECTORY_LOCATOR_SIZE;
   }
-  endOfCentralDirectorySize += END_OF_CENTRAL_DIRECTORY_RECORD_SIZE + Buffer.byteLength(self.comment, "utf-8");
+  endOfCentralDirectorySize += END_OF_CENTRAL_DIRECTORY_RECORD_SIZE + self.comment.length;
   return pretendOutputCursor + centralDirectorySize + endOfCentralDirectorySize;
 }
 
@@ -278,8 +278,7 @@ function getEndOfCentralDirectoryRecord(self, actuallyJustTellMeHowLongItWouldBe
     }
   }
 
-  var comment = Buffer.from(self.comment, "utf-8")
-  var eocdrBuffer = Buffer.alloc(END_OF_CENTRAL_DIRECTORY_RECORD_SIZE + comment.length);
+  var eocdrBuffer = Buffer.alloc(END_OF_CENTRAL_DIRECTORY_RECORD_SIZE + self.comment.length);
   // end of central dir signature                       4 bytes  (0x06054b50)
   eocdrBuffer.writeUInt32LE(0x06054b50, 0);
   // number of this disk                                2 bytes
@@ -295,9 +294,9 @@ function getEndOfCentralDirectoryRecord(self, actuallyJustTellMeHowLongItWouldBe
   // offset of start of central directory with respect to the starting disk number  4 bytes
   eocdrBuffer.writeUInt32LE(normalOffsetOfStartOfCentralDirectory, 16);
   // .ZIP file comment length                           2 bytes
-  eocdrBuffer.writeUInt16LE(comment.length, 20);
+  eocdrBuffer.writeUInt16LE(self.comment.length, 20);
   // .ZIP file comment                                  (variable size)
-  comment.copy(eocdrBuffer, 22);
+  self.comment.copy(eocdrBuffer, 22);
 
   if (!needZip64Format) return eocdrBuffer;
 
