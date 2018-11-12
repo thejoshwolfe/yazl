@@ -69,6 +69,7 @@ File paths must not end with `"/"`.
   mode: stats.mode,
   compress: true,
   forceZip64Format: false,
+  fileComment: ""
 }
 ```
 
@@ -103,6 +104,7 @@ See `addFile()` for info about the `metadataPath` parameter.
   mode: parseInt("0100664", 8),
   compress: true,
   forceZip64Format: false,
+  fileComment: "",
   size: 12345, // example value
 }
 ```
@@ -127,6 +129,7 @@ See `addFile()` for info about the `metadataPath` parameter.
   mode: parseInt("0100664", 8),
   compress: true,
   forceZip64Format: false,
+  fileComment: ""
 }
 ```
 

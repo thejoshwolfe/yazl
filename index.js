@@ -17,6 +17,7 @@ function ZipFile() {
   this.ended = false; // .end() sets this
   this.allDone = false; // set when we've written the last bytes
   this.forceZip64Eocd = false; // configurable in .end()
+  this.comment = "";
 }
 
 ZipFile.prototype.addFile = function(realPath, metadataPath, options) {
@@ -226,7 +227,7 @@ function calculateFinalSize(self) {
       }
     }
 
-    centralDirectorySize += CENTRAL_DIRECTORY_RECORD_FIXED_SIZE + entry.utf8FileName.length;
+    centralDirectorySize += CENTRAL_DIRECTORY_RECORD_FIXED_SIZE + entry.utf8FileName.length + entry.fileComment.length;
     if (useZip64Format) {
       centralDirectorySize += ZIP64_EXTENDED_INFORMATION_EXTRA_FIELD_SIZE;
     }
@@ -240,7 +241,7 @@ function calculateFinalSize(self) {
     // use zip64 end of central directory stuff
     endOfCentralDirectorySize += ZIP64_END_OF_CENTRAL_DIRECTORY_RECORD_SIZE + ZIP64_END_OF_CENTRAL_DIRECTORY_LOCATOR_SIZE;
   }
-  endOfCentralDirectorySize += END_OF_CENTRAL_DIRECTORY_RECORD_SIZE;
+  endOfCentralDirectorySize += END_OF_CENTRAL_DIRECTORY_RECORD_SIZE + Buffer.byteLength(self.comment, "utf-8");
   return pretendOutputCursor + centralDirectorySize + endOfCentralDirectorySize;
 }
 
@@ -277,7 +278,8 @@ function getEndOfCentralDirectoryRecord(self, actuallyJustTellMeHowLongItWouldBe
     }
   }
 
-  var eocdrBuffer = new Buffer(END_OF_CENTRAL_DIRECTORY_RECORD_SIZE);
+  var comment = Buffer.from(self.comment, "utf-8")
+  var eocdrBuffer = Buffer.alloc(END_OF_CENTRAL_DIRECTORY_RECORD_SIZE + comment.length);
   // end of central dir signature                       4 bytes  (0x06054b50)
   eocdrBuffer.writeUInt32LE(0x06054b50, 0);
   // number of this disk                                2 bytes
@@ -293,9 +295,9 @@ function getEndOfCentralDirectoryRecord(self, actuallyJustTellMeHowLongItWouldBe
   // offset of start of central directory with respect to the starting disk number  4 bytes
   eocdrBuffer.writeUInt32LE(normalOffsetOfStartOfCentralDirectory, 16);
   // .ZIP file comment length                           2 bytes
-  eocdrBuffer.writeUInt16LE(0, 20);
+  eocdrBuffer.writeUInt16LE(comment.length, 20);
   // .ZIP file comment                                  (variable size)
-  // no comment
+  comment.copy(eocdrBuffer, 22);
 
   if (!needZip64Format) return eocdrBuffer;
 
@@ -395,6 +397,7 @@ function Entry(metadataPath, isDirectory, options) {
     if (options.compress != null) this.compress = !!options.compress;
   }
   this.forceZip64Format = !!options.forceZip64Format;
+  this.fileComment = Buffer.from(options.fileComment || "", "utf-8");
 }
 Entry.WAITING_FOR_METADATA = 0;
 Entry.READY_TO_PUMP_FILE_DATA = 1;
@@ -568,7 +571,7 @@ Entry.prototype.getCentralDirectoryRecord = function() {
   // extra field length              2 bytes
   fixedSizeStuff.writeUInt16LE(zeiefBuffer.length, 30);
   // file comment length             2 bytes
-  fixedSizeStuff.writeUInt16LE(0, 32);
+  fixedSizeStuff.writeUInt16LE(this.fileComment.length, 32);
   // disk number start               2 bytes
   fixedSizeStuff.writeUInt16LE(0, 34);
   // internal file attributes        2 bytes
@@ -585,7 +588,7 @@ Entry.prototype.getCentralDirectoryRecord = function() {
     // extra field (variable size)
     zeiefBuffer,
     // file comment (variable size)
-    // empty comment
+    this.fileComment
   ]);
 };
 Entry.prototype.getCompressionMethod = function() {
@@ -609,7 +612,7 @@ function dateToDosDateTime(jsDate) {
 }
 
 function writeUInt64LE(buffer, n, offset) {
-  // can't use bitshift here, because JavaScript only allows bitshiting on 32-bit integers.
+  // can't use bitshift here, because JavaScript only allows bitshifting on 32-bit integers.
   var high = Math.floor(n / 0x100000000);
   var low = n % 0x100000000;
   buffer.writeUInt32LE(low, offset);
