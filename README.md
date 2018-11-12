@@ -28,7 +28,7 @@ zipfile.outputStream.pipe(fs.createWriteStream("output.zip")).on("close", functi
 });
 // alternate apis for adding files:
 zipfile.addReadStream(process.stdin, "stdin.txt");
-zipfile.addBuffer(new Buffer("hello"), "hello.txt");
+zipfile.addBuffer(Buffer.from("hello"), "hello.txt");
 // call end() after all the files have been added
 zipfile.end();
 ```
