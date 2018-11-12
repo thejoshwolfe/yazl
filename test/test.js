@@ -57,7 +57,7 @@ var BufferList = require("bl");
     options.forceZip64Format = !!zip64Config[1];
     zipfile.addFile(__filename, "fdsa.txt", options);
     options.forceZip64Format = !!zip64Config[2];
-    zipfile.addBuffer(new Buffer("buffer"), "buffer.txt", options);
+    zipfile.addBuffer(Buffer.from("buffer"), "buffer.txt", options);
     options.forceZip64Format = !!zip64Config[3];
     options.size = "stream".length;
     zipfile.addReadStream(new BufferList().append("stream"), "stream.txt", options);
@@ -76,7 +76,7 @@ var BufferList = require("bl");
   var zipfile = new yazl.ZipFile();
   // all options parameters are optional
   zipfile.addFile(__filename, "a.txt");
-  zipfile.addBuffer(new Buffer("buffer"), "b.txt");
+  zipfile.addBuffer(Buffer.from("buffer"), "b.txt");
   zipfile.addReadStream(new BufferList().append("stream"), "c.txt");
   zipfile.addEmptyDirectory("d/");
   zipfile.addEmptyDirectory("e");
@@ -104,7 +104,7 @@ var BufferList = require("bl");
 (function() {
   var zipfile = new yazl.ZipFile();
   // all options parameters are optional
-  zipfile.addBuffer(new Buffer("hello"), "hello.txt", {compress: false});
+  zipfile.addBuffer(Buffer.from("hello"), "hello.txt", {compress: false});
   zipfile.end(function(finalSize) {
     if (finalSize === -1) throw new Error("finalSize should be known");
     zipfile.outputStream.pipe(new BufferList(function(err, data) {

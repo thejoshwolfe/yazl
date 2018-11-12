@@ -277,7 +277,7 @@ function getEndOfCentralDirectoryRecord(self, actuallyJustTellMeHowLongItWouldBe
     }
   }
 
-  var eocdrBuffer = new Buffer(END_OF_CENTRAL_DIRECTORY_RECORD_SIZE);
+  var eocdrBuffer = Buffer.alloc(END_OF_CENTRAL_DIRECTORY_RECORD_SIZE);
   // end of central dir signature                       4 bytes  (0x06054b50)
   eocdrBuffer.writeUInt32LE(0x06054b50, 0);
   // number of this disk                                2 bytes
@@ -301,7 +301,7 @@ function getEndOfCentralDirectoryRecord(self, actuallyJustTellMeHowLongItWouldBe
 
   // ZIP64 format
   // ZIP64 End of Central Directory Record
-  var zip64EocdrBuffer = new Buffer(ZIP64_END_OF_CENTRAL_DIRECTORY_RECORD_SIZE);
+  var zip64EocdrBuffer = Buffer.alloc(ZIP64_END_OF_CENTRAL_DIRECTORY_RECORD_SIZE);
   // zip64 end of central dir signature                                             4 bytes  (0x06064b50)
   zip64EocdrBuffer.writeUInt32LE(0x06064b50, 0);
   // size of zip64 end of central directory record                                  8 bytes
@@ -327,7 +327,7 @@ function getEndOfCentralDirectoryRecord(self, actuallyJustTellMeHowLongItWouldBe
 
 
   // ZIP64 End of Central Directory Locator
-  var zip64EocdlBuffer = new Buffer(ZIP64_END_OF_CENTRAL_DIRECTORY_LOCATOR_SIZE);
+  var zip64EocdlBuffer = Buffer.alloc(ZIP64_END_OF_CENTRAL_DIRECTORY_LOCATOR_SIZE);
   // zip64 end of central dir locator signature                               4 bytes  (0x07064b50)
   zip64EocdlBuffer.writeUInt32LE(0x07064b50, 0);
   // number of the disk with the start of the zip64 end of central directory  4 bytes
@@ -365,7 +365,7 @@ var defaultDirectoryMode = parseInt("040775", 8);
 
 // this class is not part of the public API
 function Entry(metadataPath, isDirectory, options) {
-  this.utf8FileName = new Buffer(metadataPath);
+  this.utf8FileName = Buffer.from(metadataPath);
   if (this.utf8FileName.length > 0xffff) throw new Error("utf8 file name too long. " + utf8FileName.length + " > " + 0xffff);
   this.isDirectory = isDirectory;
   this.state = Entry.WAITING_FOR_METADATA;
@@ -440,7 +440,7 @@ Entry.prototype.getLocalFileHeader = function() {
     uncompressedSize = this.uncompressedSize;
   }
 
-  var fixedSizeStuff = new Buffer(LOCAL_FILE_HEADER_FIXED_SIZE);
+  var fixedSizeStuff = Buffer.alloc(LOCAL_FILE_HEADER_FIXED_SIZE);
   var generalPurposeBitFlag = FILE_NAME_IS_UTF8;
   if (!this.crcAndFileSizeKnown) generalPurposeBitFlag |= UNKNOWN_CRC32_AND_FILE_SIZES;
 
@@ -479,10 +479,10 @@ var ZIP64_DATA_DESCRIPTOR_SIZE = 24;
 Entry.prototype.getDataDescriptor = function() {
   if (this.crcAndFileSizeKnown) {
     // the Mac Archive Utility requires this not be present unless we set general purpose bit 3
-    return new Buffer(0);
+    return Buffer.alloc(0);
   }
   if (!this.useZip64Format()) {
-    var buffer = new Buffer(DATA_DESCRIPTOR_SIZE);
+    var buffer = Buffer.alloc(DATA_DESCRIPTOR_SIZE);
     // optional signature (required according to Archive Utility)
     buffer.writeUInt32LE(0x08074b50, 0);
     // crc-32                          4 bytes
@@ -494,7 +494,7 @@ Entry.prototype.getDataDescriptor = function() {
     return buffer;
   } else {
     // ZIP64 format
-    var buffer = new Buffer(ZIP64_DATA_DESCRIPTOR_SIZE);
+    var buffer = Buffer.alloc(ZIP64_DATA_DESCRIPTOR_SIZE);
     // optional signature (unknown if anyone cares about this)
     buffer.writeUInt32LE(0x08074b50, 0);
     // crc-32                          4 bytes
@@ -509,7 +509,7 @@ Entry.prototype.getDataDescriptor = function() {
 var CENTRAL_DIRECTORY_RECORD_FIXED_SIZE = 46;
 var ZIP64_EXTENDED_INFORMATION_EXTRA_FIELD_SIZE = 28;
 Entry.prototype.getCentralDirectoryRecord = function() {
-  var fixedSizeStuff = new Buffer(CENTRAL_DIRECTORY_RECORD_FIXED_SIZE);
+  var fixedSizeStuff = Buffer.alloc(CENTRAL_DIRECTORY_RECORD_FIXED_SIZE);
   var generalPurposeBitFlag = FILE_NAME_IS_UTF8;
   if (!this.crcAndFileSizeKnown) generalPurposeBitFlag |= UNKNOWN_CRC32_AND_FILE_SIZES;
 
@@ -525,7 +525,7 @@ Entry.prototype.getCentralDirectoryRecord = function() {
     versionNeededToExtract = VERSION_NEEDED_TO_EXTRACT_ZIP64;
 
     // ZIP64 extended information extra field
-    zeiefBuffer = new Buffer(ZIP64_EXTENDED_INFORMATION_EXTRA_FIELD_SIZE);
+    zeiefBuffer = Buffer.alloc(ZIP64_EXTENDED_INFORMATION_EXTRA_FIELD_SIZE);
     // 0x0001                  2 bytes    Tag for this "extra" block type
     zeiefBuffer.writeUInt16LE(0x0001, 0);
     // Size                    2 bytes    Size of this "extra" block
@@ -540,7 +540,7 @@ Entry.prototype.getCentralDirectoryRecord = function() {
     // (omit)
   } else {
     versionNeededToExtract = VERSION_NEEDED_TO_EXTRACT_UTF8;
-    zeiefBuffer = new Buffer(0);
+    zeiefBuffer = Buffer.alloc(0);
   }
 
   // central file header signature   4 bytes  (0x02014b50)
