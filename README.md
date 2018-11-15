@@ -53,7 +53,8 @@ A valid `metadataPath` must not be blank.
 If a `metadataPath` contains `"\\"` characters, they will be replaced by `"/"` characters.
 After this substitution, a valid `metadataPath` must not start with `"/"` or `/[A-Za-z]:\//`,
 and must not contain `".."` path segments.
-File paths must not end with `"/"`.
+File paths must not end with `"/"`, but see `addEmptyDirectory()`.
+After UTF-8 encoding, `metadataPath` must be at most `0xffff` bytes in length.
 
 `options` may be omitted or null and has the following structure and default values:
 
@@ -63,7 +64,7 @@ File paths must not end with `"/"`.
   mode: stats.mode,
   compress: true,
   forceZip64Format: false,
-  fileComment: ""
+  fileComment: "", // or a UTF-8 Buffer
 }
 ```
 
@@ -80,6 +81,10 @@ If `compress` is `false`, the file data will be stored (compression method 0).
 If `forceZip64Format` is `true`, yazl will use ZIP64 format in this entry's Data Descriptor
 and Central Directory Record regardless of if it's required or not (this may be useful for testing.).
 Otherwise, yazl will use ZIP64 format where necessary.
+
+If `fileComment` is a `string`, it will be encoded with UTF-8.
+If `fileComment` is a `Buffer`, it should be a UTF-8 encoded string.
+In UTF-8, `fileComment` must be at most `0xffff` bytes in length.
 
 Internally, `fs.stat()` is called immediately in the `addFile` function,
 and `fs.createReadStream()` is used later when the file data is actually required.
@@ -98,12 +103,12 @@ See `addFile()` for info about the `metadataPath` parameter.
   mode: 0o100664,
   compress: true,
   forceZip64Format: false,
-  fileComment: "",
+  fileComment: "", // or a UTF-8 Buffer
   size: 12345, // example value
 }
 ```
 
-See `addFile()` for the meaning of `mtime`, `mode`, `compress`, and `forceZip64Format`.
+See `addFile()` for the meaning of `mtime`, `mode`, `compress`, `forceZip64Format`, and `fileComment`.
 If `size` is given, it will be checked against the actual number of bytes in the `readStream`,
 and an error will be emitted if there is a mismatch.
 
@@ -123,11 +128,11 @@ See `addFile()` for info about the `metadataPath` parameter.
   mode: 0o100664,
   compress: true,
   forceZip64Format: false,
-  fileComment: ""
+  fileComment: "", // or a UTF-8 Buffer
 }
 ```
 
-See `addFile()` for the meaning of `mtime`, `mode`, `compress`, and `forceZip64Format`.
+See `addFile()` for the meaning of `mtime`, `mode`, `compress`, `forceZip64Format`, and `fileComment`.
 
 This method has the unique property that General Purpose Bit `3` will not be used in the Local File Header.
 This doesn't matter for unzip implementations that conform to the Zip File Spec.
@@ -185,8 +190,8 @@ and causes the eventual close of `outputStream`.
 
 ```js
 {
-  comment: "",
   forceZip64Format: false,
+  comment: "", // or a CP437 Buffer
 }
 ```
 
@@ -194,6 +199,16 @@ If `forceZip64Format` is `true`, yazl will include the ZIP64 End of Central Dire
 and ZIP64 End of Central Directory Record regardless of whether or not they are required
 (this may be useful for testing.).
 Otherwise, yazl will include these structures if necessary.
+
+If `comment` is a `string`, it will be encoded with CP437.
+If `comment` is a `Buffer`, it should be a CP437 encoded string.
+`comment` must be at most `0xffff` bytes in length.
+Note that in practice, most zipfile readers interpret this field in UTF-8 instead of CP437.
+If your string uses only codepoints in the range `0x20...0x7e`
+(printable ASCII, no whitespace except for sinlge space `' '`),
+then UTF-8 and CP437 (and ASCII) encodings are all identical.
+This restriction is recommended for maxium compatibility.
+To use UTF-8 encoding at your own risk, pass a `Buffer` into this function; it will not be validated.
 
 If specified and non-null, `finalSizeCallback` is given the parameters `(finalSize)`
 sometime during or after the call to `end()`.
@@ -271,7 +286,7 @@ Note that the "UNIX" has implications in the External File Attributes.
 
 ### Version Needed to Extract
 
-Usually `20`, meaning 2.0. This allows filenames to be UTF-8 encoded.
+Usually `20`, meaning 2.0. This allows filenames and file comments to be UTF-8 encoded.
 
 When ZIP64 format is used, some of the Version Needed to Extract values will be `45`, meaning 4.5.
 When this happens, there may be a mix of `20` and `45` values throughout the zipfile.
@@ -279,7 +294,7 @@ When this happens, there may be a mix of `20` and `45` values throughout the zip
 ### General Purpose Bit Flag
 
 Bit `11` is always set.
-Filenames are always encoded in utf8, even if the result is indistinguishable from ascii.
+Filenames (and file comments) are always encoded in UTF-8, even if the result is indistinguishable from ascii.
 
 Bit `3` is usually set in the Local File Header.
 To support both a streaming input and streaming output api,
@@ -322,6 +337,13 @@ Unzip clients seem to respect this style of pathing,
 and the zip file spec does not specify what is standard in this regard.
 
 In order to create empty directories, use `addEmptyDirectory()`.
+
+### Size of Local File and Central Directory Entry Metadata
+
+The spec recommends that "The combined length of any directory record and [the file name,
+extra field, and comment fields] should not generally exceed 65,535 bytes".
+yazl makes no attempt to respect this recommendation.
+Instead, each of the fields is limited to 65,535 bytes due to the length of each being encoded as an unsigned 16 bit integer.
 
 ## Change History
 
