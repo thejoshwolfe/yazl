@@ -85,6 +85,7 @@ Otherwise, yazl will use ZIP64 format where necessary.
 If `fileComment` is a `string`, it will be encoded with UTF-8.
 If `fileComment` is a `Buffer`, it should be a UTF-8 encoded string.
 In UTF-8, `fileComment` must be at most `0xffff` bytes in length.
+This becomes the "file comment" field in this entry's central directory file header.
 
 Internally, `fs.stat()` is called immediately in the `addFile` function,
 and `fs.createReadStream()` is used later when the file data is actually required.
@@ -203,6 +204,7 @@ Otherwise, yazl will include these structures if necessary.
 If `comment` is a `string`, it will be encoded with CP437.
 If `comment` is a `Buffer`, it should be a CP437 encoded string.
 `comment` must be at most `0xffff` bytes in length.
+This becomes the ".ZIP file comment" field in the end of central directory record.
 Note that in practice, most zipfile readers interpret this field in UTF-8 instead of CP437.
 If your string uses only codepoints in the range `0x20...0x7e`
 (printable ASCII, no whitespace except for sinlge space `' '`),
@@ -347,6 +349,9 @@ Instead, each of the fields is limited to 65,535 bytes due to the length of each
 
 ## Change History
 
+ * 2.5.0
+   * Add support for `comment` and `fileComment`. [pull #44](https://github.com/thejoshwolfe/yazl/pull/44)
+   * Avoid `new Buffer()`. [pull #43](https://github.com/thejoshwolfe/yazl/pull/43)
  * 2.4.3
    * Clarify readme. [pull #33](https://github.com/thejoshwolfe/yazl/pull/33)
  * 2.4.2
