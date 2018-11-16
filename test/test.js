@@ -126,3 +126,64 @@ var BufferList = require("bl");
     }));
   });
 })();
+
+var weirdChars = '\u0000☺☻♥♦♣♠•◘○◙♂♀♪♫☼►◄↕‼¶§▬↨↑↓→←∟↔▲▼⌂ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥₧ƒáíóúñÑªº¿⌐¬½¼¡«»░▒▓│┤╡╢╖╕╣║╗╝╜╛┐└┴┬├─┼╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪┘┌█▄▌▐▀αßΓπΣσµτΦΘΩδ∞φε∩≡±≥≤⌠⌡÷≈°∙·√ⁿ²■ ';
+(function() {
+  var testCases = [
+    ["Hello World", "Hello World"],
+    [Buffer.from("Hello"), "Hello"],
+    [weirdChars, weirdChars],
+  ];
+  testCases.forEach(function(testCase, i) {
+    var zipfile = new yazl.ZipFile();
+    zipfile.end({
+      comment: testCase[0]
+    }, function(finalSize) {
+      if (finalSize === -1) throw new Error("finalSize should be known");
+      zipfile.outputStream.pipe(new BufferList(function(err, data) {
+        if (err) throw err;
+        if (data.length !== finalSize) throw new Error("finalSize prediction is wrong. " + finalSize + " !== " + data.length);
+        yauzl.fromBuffer(data, function(err, zipfile) {
+          if (err) throw err;
+          if (zipfile.comment !== testCase[1]) {
+            throw new Error("comment is wrong. " + JSON.stringify(zipfile.comment) + " !== " + JSON.stringify(testCase[1]));
+          }
+          console.log("comment(" + i + "): pass");
+        });
+      }));
+    });
+  });
+})();
+
+(function() {
+  var testCases = [
+    ["Hello World!", "Hello World!"],
+    [Buffer.from("Hello!"), "Hello!"],
+    [weirdChars, weirdChars],
+  ];
+  testCases.forEach(function(testCase, i) {
+    var zipfile = new yazl.ZipFile();
+    // all options parameters are optional
+    zipfile.addBuffer(Buffer.from("hello"), "hello.txt", {compress: false, fileComment: testCase[0]});
+    zipfile.end(function(finalSize) {
+      if (finalSize === -1) throw new Error("finalSize should be known");
+      zipfile.outputStream.pipe(new BufferList(function(err, data) {
+        if (err) throw err;
+        if (data.length !== finalSize) throw new Error("finalSize prediction is wrong. " + finalSize + " !== " + data.length);
+        yauzl.fromBuffer(data, function(err, zipfile) {
+          if (err) throw err;
+          var entryNames = ["hello.txt"];
+          zipfile.on("entry", function(entry) {
+            var expectedName = entryNames.shift();
+            if (entry.fileComment !== testCase[1]) {
+              throw new Error("fileComment is wrong. " + JSON.stringify(entry.fileComment) + " !== " + JSON.stringify(testCase[1]));
+            }
+          });
+          zipfile.on("end", function() {
+            if (entryNames.length === 0) console.log("fileComment(" + i + "): pass");
+          });
+        });
+      }));
+    });
+  });
+})();

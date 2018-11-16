@@ -118,6 +118,18 @@ ZipFile.prototype.end = function(options, finalSizeCallback) {
   this.ended = true;
   this.finalSizeCallback = finalSizeCallback;
   this.forceZip64Eocd = !!options.forceZip64Format;
+  if (options.comment) {
+    if (typeof options.comment === "string") {
+      this.comment = encodeCp437(options.comment);
+    } else {
+      // It should be a Buffer
+      this.comment = options.comment;
+    }
+    if (this.comment.length > 0xffff) throw new Error("comment is too large");
+  } else {
+    // no comment.
+    this.comment = EMPTY_BUFFER;
+  }
   pumpEntries(this);
 };
 
@@ -226,7 +238,7 @@ function calculateFinalSize(self) {
       }
     }
 
-    centralDirectorySize += CENTRAL_DIRECTORY_RECORD_FIXED_SIZE + entry.utf8FileName.length;
+    centralDirectorySize += CENTRAL_DIRECTORY_RECORD_FIXED_SIZE + entry.utf8FileName.length + entry.fileComment.length;
     if (useZip64Format) {
       centralDirectorySize += ZIP64_EXTENDED_INFORMATION_EXTRA_FIELD_SIZE;
     }
@@ -240,7 +252,7 @@ function calculateFinalSize(self) {
     // use zip64 end of central directory stuff
     endOfCentralDirectorySize += ZIP64_END_OF_CENTRAL_DIRECTORY_RECORD_SIZE + ZIP64_END_OF_CENTRAL_DIRECTORY_LOCATOR_SIZE;
   }
-  endOfCentralDirectorySize += END_OF_CENTRAL_DIRECTORY_RECORD_SIZE;
+  endOfCentralDirectorySize += END_OF_CENTRAL_DIRECTORY_RECORD_SIZE + self.comment.length;
   return pretendOutputCursor + centralDirectorySize + endOfCentralDirectorySize;
 }
 
@@ -277,7 +289,7 @@ function getEndOfCentralDirectoryRecord(self, actuallyJustTellMeHowLongItWouldBe
     }
   }
 
-  var eocdrBuffer = Buffer.allocUnsafe(END_OF_CENTRAL_DIRECTORY_RECORD_SIZE);
+  var eocdrBuffer = Buffer.allocUnsafe(END_OF_CENTRAL_DIRECTORY_RECORD_SIZE + self.comment.length);
   // end of central dir signature                       4 bytes  (0x06054b50)
   eocdrBuffer.writeUInt32LE(0x06054b50, 0);
   // number of this disk                                2 bytes
@@ -293,9 +305,9 @@ function getEndOfCentralDirectoryRecord(self, actuallyJustTellMeHowLongItWouldBe
   // offset of start of central directory with respect to the starting disk number  4 bytes
   eocdrBuffer.writeUInt32LE(normalOffsetOfStartOfCentralDirectory, 16);
   // .ZIP file comment length                           2 bytes
-  eocdrBuffer.writeUInt16LE(0, 20);
+  eocdrBuffer.writeUInt16LE(self.comment.length, 20);
   // .ZIP file comment                                  (variable size)
-  // no comment
+  self.comment.copy(eocdrBuffer, 22);
 
   if (!needZip64Format) return eocdrBuffer;
 
@@ -360,6 +372,8 @@ function validateMetadataPath(metadataPath, isDirectory) {
   return metadataPath;
 }
 
+var EMPTY_BUFFER = Buffer.allocUnsafe(0);
+
 // this class is not part of the public API
 function Entry(metadataPath, isDirectory, options) {
   this.utf8FileName = Buffer.from(metadataPath);
@@ -392,6 +406,18 @@ function Entry(metadataPath, isDirectory, options) {
     if (options.compress != null) this.compress = !!options.compress;
   }
   this.forceZip64Format = !!options.forceZip64Format;
+  if (options.fileComment) {
+    if (typeof options.fileComment === "string") {
+      this.fileComment = Buffer.from(options.fileComment, "utf-8");
+    } else {
+      // It should be a Buffer
+      this.fileComment = options.fileComment;
+    }
+    if (this.fileComment.length > 0xffff) throw new Error("fileComment is too large");
+  } else {
+    // no comment.
+    this.fileComment = EMPTY_BUFFER;
+  }
 }
 Entry.WAITING_FOR_METADATA = 0;
 Entry.READY_TO_PUMP_FILE_DATA = 1;
@@ -565,7 +591,7 @@ Entry.prototype.getCentralDirectoryRecord = function() {
   // extra field length              2 bytes
   fixedSizeStuff.writeUInt16LE(zeiefBuffer.length, 30);
   // file comment length             2 bytes
-  fixedSizeStuff.writeUInt16LE(0, 32);
+  fixedSizeStuff.writeUInt16LE(this.fileComment.length, 32);
   // disk number start               2 bytes
   fixedSizeStuff.writeUInt16LE(0, 34);
   // internal file attributes        2 bytes
@@ -582,7 +608,7 @@ Entry.prototype.getCentralDirectoryRecord = function() {
     // extra field (variable size)
     zeiefBuffer,
     // file comment (variable size)
-    // empty comment
+    this.fileComment,
   ]);
 };
 Entry.prototype.getCompressionMethod = function() {
@@ -606,7 +632,7 @@ function dateToDosDateTime(jsDate) {
 }
 
 function writeUInt64LE(buffer, n, offset) {
-  // can't use bitshift here, because JavaScript only allows bitshiting on 32-bit integers.
+  // can't use bitshift here, because JavaScript only allows bitshifting on 32-bit integers.
   var high = Math.floor(n / 0x100000000);
   var low = n % 0x100000000;
   buffer.writeUInt32LE(low, offset);
@@ -636,3 +662,32 @@ Crc32Watcher.prototype._transform = function(chunk, encoding, cb) {
   this.crc32 = crc32.unsigned(chunk, this.crc32);
   cb(null, chunk);
 };
+
+var cp437 = '\u0000☺☻♥♦♣♠•◘○◙♂♀♪♫☼►◄↕‼¶§▬↨↑↓→←∟↔▲▼ !"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~⌂ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥₧ƒáíóúñÑªº¿⌐¬½¼¡«»░▒▓│┤╡╢╖╕╣║╗╝╜╛┐└┴┬├─┼╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪┘┌█▄▌▐▀αßΓπΣσµτΦΘΩδ∞φε∩≡±≥≤⌠⌡÷≈°∙·√ⁿ²■ ';
+if (cp437.length !== 256) throw new Error("assertion failure");
+var reverseCp437 = null;
+
+function encodeCp437(string) {
+  if (/^[\x20-\x7e]*$/.test(string)) {
+    // CP437, ASCII, and UTF-8 overlap in this range.
+    return Buffer.from(string, "utf-8");
+  }
+
+  // This is the slow path.
+  if (reverseCp437 == null) {
+    // cache this once
+    reverseCp437 = {};
+    for (var i = 0; i < cp437.length; i++) {
+      reverseCp437[cp437[i]] = i;
+    }
+  }
+
+  var result = Buffer.allocUnsafe(string.length);
+  for (var i = 0; i < string.length; i++) {
+    var b = reverseCp437[string[i]];
+    if (b == null) throw new Error("character not encodable in CP437: " + JSON.stringify(string[i]));
+    result[i] = b;
+  }
+
+  return result;
+}
