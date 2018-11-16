@@ -118,7 +118,18 @@ ZipFile.prototype.end = function(options, finalSizeCallback) {
   this.ended = true;
   this.finalSizeCallback = finalSizeCallback;
   this.forceZip64Eocd = !!options.forceZip64Format;
-  this.comment = Buffer.from(options.comment || "", "utf-8");
+  if (options.comment) {
+    if (typeof options.comment === "string") {
+      this.comment = encodeCp437(options.comment);
+    } else {
+      // It should be a Buffer
+      this.comment = options.comment;
+    }
+    if (this.comment.length > 0xffff) throw new Error("comment is too large");
+  } else {
+    // no comment.
+    this.comment = EMPTY_BUFFER;
+  }
   pumpEntries(this);
 };
 
@@ -361,6 +372,8 @@ function validateMetadataPath(metadataPath, isDirectory) {
   return metadataPath;
 }
 
+var EMPTY_BUFFER = Buffer.allocUnsafe(0);
+
 // this class is not part of the public API
 function Entry(metadataPath, isDirectory, options) {
   this.utf8FileName = Buffer.from(metadataPath);
@@ -393,7 +406,18 @@ function Entry(metadataPath, isDirectory, options) {
     if (options.compress != null) this.compress = !!options.compress;
   }
   this.forceZip64Format = !!options.forceZip64Format;
-  this.fileComment = Buffer.from(options.fileComment || "", "utf-8");
+  if (options.fileComment) {
+    if (typeof options.fileComment === "string") {
+      this.fileComment = Buffer.from(options.fileComment, "utf-8");
+    } else {
+      // It should be a Buffer
+      this.fileComment = options.fileComment;
+    }
+    if (this.fileComment.length > 0xffff) throw new Error("fileComment is too large");
+  } else {
+    // no comment.
+    this.fileComment = EMPTY_BUFFER;
+  }
 }
 Entry.WAITING_FOR_METADATA = 0;
 Entry.READY_TO_PUMP_FILE_DATA = 1;
@@ -584,7 +608,7 @@ Entry.prototype.getCentralDirectoryRecord = function() {
     // extra field (variable size)
     zeiefBuffer,
     // file comment (variable size)
-    this.fileComment
+    this.fileComment,
   ]);
 };
 Entry.prototype.getCompressionMethod = function() {
@@ -638,3 +662,32 @@ Crc32Watcher.prototype._transform = function(chunk, encoding, cb) {
   this.crc32 = crc32.unsigned(chunk, this.crc32);
   cb(null, chunk);
 };
+
+var cp437 = '\u0000☺☻♥♦♣♠•◘○◙♂♀♪♫☼►◄↕‼¶§▬↨↑↓→←∟↔▲▼ !"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~⌂ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥₧ƒáíóúñÑªº¿⌐¬½¼¡«»░▒▓│┤╡╢╖╕╣║╗╝╜╛┐└┴┬├─┼╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪┘┌█▄▌▐▀αßΓπΣσµτΦΘΩδ∞φε∩≡±≥≤⌠⌡÷≈°∙·√ⁿ²■ ';
+if (cp437.length !== 256) throw new Error("assertion failure");
+var reverseCp437 = null;
+
+function encodeCp437(string) {
+  if (/^[\x20-\x7e]*$/.test(string)) {
+    // CP437, ASCII, and UTF-8 overlap in this range.
+    return Buffer.from(string, "utf-8");
+  }
+
+  // This is the slow path.
+  if (reverseCp437 == null) {
+    // cache this once
+    reverseCp437 = {};
+    for (var i = 0; i < cp437.length; i++) {
+      reverseCp437[cp437[i]] = i;
+    }
+  }
+
+  var result = Buffer.allocUnsafe(string.length);
+  for (var i = 0; i < string.length; i++) {
+    var b = reverseCp437[string[i]];
+    if (b == null) throw new Error("character not encodable in CP437: " + JSON.stringify(string[i]));
+    result[i] = b;
+  }
+
+  return result;
+}
