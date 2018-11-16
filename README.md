@@ -203,7 +203,7 @@ Otherwise, yazl will include these structures if necessary.
 
 If `comment` is a `string`, it will be encoded with CP437.
 If `comment` is a `Buffer`, it should be a CP437 encoded string.
-`comment` must be at most `0xffff` bytes in length.
+`comment` must be at most `0xffff` bytes in length and must not include the byte sequence `[0x50,0x4b,0x05,0x06]`.
 This becomes the ".ZIP file comment" field in the end of central directory record.
 Note that in practice, most zipfile readers interpret this field in UTF-8 instead of CP437.
 If your string uses only codepoints in the range `0x20...0x7e`
@@ -211,6 +211,7 @@ If your string uses only codepoints in the range `0x20...0x7e`
 then UTF-8 and CP437 (and ASCII) encodings are all identical.
 This restriction is recommended for maxium compatibility.
 To use UTF-8 encoding at your own risk, pass a `Buffer` into this function; it will not be validated.
+
 
 If specified and non-null, `finalSizeCallback` is given the parameters `(finalSize)`
 sometime during or after the call to `end()`.

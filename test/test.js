@@ -137,7 +137,7 @@ var weirdChars = '\u0000☺☻♥♦♣♠•◘○◙♂♀♪♫☼►◄↕�
   testCases.forEach(function(testCase, i) {
     var zipfile = new yazl.ZipFile();
     zipfile.end({
-      comment: testCase[0]
+      comment: testCase[0],
     }, function(finalSize) {
       if (finalSize === -1) throw new Error("finalSize should be known");
       zipfile.outputStream.pipe(new BufferList(function(err, data) {
@@ -153,6 +153,21 @@ var weirdChars = '\u0000☺☻♥♦♣♠•◘○◙♂♀♪♫☼►◄↕�
       }));
     });
   });
+})();
+
+(function() {
+  var zipfile = new yazl.ZipFile();
+  try {
+    zipfile.end({
+      comment: Buffer.from("\x50\x4b\x05\x06" + "01234567890123456789")
+    });
+  } catch (e) {
+    if (e.toString().indexOf("comment contains end of central directory record signature")) {
+      console.log("block eocdr signature in comment: pass");
+      return;
+    }
+  }
+  throw new Error("expected error for including eocdr signature in comment");
 })();
 
 (function() {

@@ -108,6 +108,8 @@ ZipFile.prototype.addEmptyDirectory = function(metadataPath, options) {
   pumpEntries(self);
 };
 
+var eocdrSignatureBuffer = Buffer.from([0x50, 0x4b, 0x05, 0x06]);
+
 ZipFile.prototype.end = function(options, finalSizeCallback) {
   if (typeof options === "function") {
     finalSizeCallback = options;
@@ -126,6 +128,8 @@ ZipFile.prototype.end = function(options, finalSizeCallback) {
       this.comment = options.comment;
     }
     if (this.comment.length > 0xffff) throw new Error("comment is too large");
+    // gotta check for this, because the zipfile format is actually ambiguous.
+    if (this.comment.includes(eocdrSignatureBuffer)) throw new Error("comment contains end of central directory record signature");
   } else {
     // no comment.
     this.comment = EMPTY_BUFFER;
