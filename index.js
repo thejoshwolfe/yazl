@@ -108,7 +108,18 @@ ZipFile.prototype.addEmptyDirectory = function(metadataPath, options) {
   pumpEntries(self);
 };
 
-var eocdrSignatureBuffer = Buffer.from([0x50, 0x4b, 0x05, 0x06]);
+function bufferFrom(content,encoding="utf-8") {
+  try {
+    return Buffer.from(content,encoding);
+  } catch(e) {
+    if (Object.prototype.toString.call(content) !== '[object String]') {
+      throw new TypeError("separator must be a string");
+    }
+    return new Buffer(content,encoding);
+  }
+}
+
+var eocdrSignatureBuffer = bufferFrom([0x50, 0x4b, 0x05, 0x06]);
 
 ZipFile.prototype.end = function(options, finalSizeCallback) {
   if (typeof options === "function") {
@@ -380,7 +391,7 @@ var EMPTY_BUFFER = Buffer.allocUnsafe(0);
 
 // this class is not part of the public API
 function Entry(metadataPath, isDirectory, options) {
-  this.utf8FileName = Buffer.from(metadataPath);
+  this.utf8FileName = bufferFrom(metadataPath);
   if (this.utf8FileName.length > 0xffff) throw new Error("utf8 file name too long. " + utf8FileName.length + " > " + 0xffff);
   this.isDirectory = isDirectory;
   this.state = Entry.WAITING_FOR_METADATA;
@@ -412,7 +423,7 @@ function Entry(metadataPath, isDirectory, options) {
   this.forceZip64Format = !!options.forceZip64Format;
   if (options.fileComment) {
     if (typeof options.fileComment === "string") {
-      this.fileComment = Buffer.from(options.fileComment, "utf-8");
+      this.fileComment = bufferFrom(options.fileComment, "utf-8");
     } else {
       // It should be a Buffer
       this.fileComment = options.fileComment;
@@ -674,7 +685,7 @@ var reverseCp437 = null;
 function encodeCp437(string) {
   if (/^[\x20-\x7e]*$/.test(string)) {
     // CP437, ASCII, and UTF-8 overlap in this range.
-    return Buffer.from(string, "utf-8");
+    return bufferFrom(string, "utf-8");
   }
 
   // This is the slow path.
