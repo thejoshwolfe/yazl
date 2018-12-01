@@ -1,5 +1,8 @@
 # yazl
 
+[![Build Status](https://travis-ci.org/thejoshwolfe/yazl.svg?branch=master)](https://travis-ci.org/thejoshwolfe/yazl)
+[![Coverage Status](https://img.shields.io/coveralls/thejoshwolfe/yazl.svg)](https://coveralls.io/r/thejoshwolfe/yazl)
+
 yet another zip library for node. For unzipping, see
 [yauzl](https://github.com/thejoshwolfe/yauzl).
 
