@@ -108,7 +108,7 @@ ZipFile.prototype.addEmptyDirectory = function(metadataPath, options) {
   pumpEntries(self);
 };
 
-var eocdrSignatureBuffer = Buffer.from([0x50, 0x4b, 0x05, 0x06]);
+var eocdrSignatureBuffer = bufferFrom([0x50, 0x4b, 0x05, 0x06]);
 
 ZipFile.prototype.end = function(options, finalSizeCallback) {
   if (typeof options === "function") {
@@ -129,7 +129,7 @@ ZipFile.prototype.end = function(options, finalSizeCallback) {
     }
     if (this.comment.length > 0xffff) throw new Error("comment is too large");
     // gotta check for this, because the zipfile format is actually ambiguous.
-    if (this.comment.includes(eocdrSignatureBuffer)) throw new Error("comment contains end of central directory record signature");
+    if (bufferIncludes(this.comment, eocdrSignatureBuffer)) throw new Error("comment contains end of central directory record signature");
   } else {
     // no comment.
     this.comment = EMPTY_BUFFER;
@@ -293,7 +293,7 @@ function getEndOfCentralDirectoryRecord(self, actuallyJustTellMeHowLongItWouldBe
     }
   }
 
-  var eocdrBuffer = Buffer.allocUnsafe(END_OF_CENTRAL_DIRECTORY_RECORD_SIZE + self.comment.length);
+  var eocdrBuffer = bufferAlloc(END_OF_CENTRAL_DIRECTORY_RECORD_SIZE + self.comment.length);
   // end of central dir signature                       4 bytes  (0x06054b50)
   eocdrBuffer.writeUInt32LE(0x06054b50, 0);
   // number of this disk                                2 bytes
@@ -317,7 +317,7 @@ function getEndOfCentralDirectoryRecord(self, actuallyJustTellMeHowLongItWouldBe
 
   // ZIP64 format
   // ZIP64 End of Central Directory Record
-  var zip64EocdrBuffer = Buffer.allocUnsafe(ZIP64_END_OF_CENTRAL_DIRECTORY_RECORD_SIZE);
+  var zip64EocdrBuffer = bufferAlloc(ZIP64_END_OF_CENTRAL_DIRECTORY_RECORD_SIZE);
   // zip64 end of central dir signature                                             4 bytes  (0x06064b50)
   zip64EocdrBuffer.writeUInt32LE(0x06064b50, 0);
   // size of zip64 end of central directory record                                  8 bytes
@@ -343,7 +343,7 @@ function getEndOfCentralDirectoryRecord(self, actuallyJustTellMeHowLongItWouldBe
 
 
   // ZIP64 End of Central Directory Locator
-  var zip64EocdlBuffer = Buffer.allocUnsafe(ZIP64_END_OF_CENTRAL_DIRECTORY_LOCATOR_SIZE);
+  var zip64EocdlBuffer = bufferAlloc(ZIP64_END_OF_CENTRAL_DIRECTORY_LOCATOR_SIZE);
   // zip64 end of central dir locator signature                               4 bytes  (0x07064b50)
   zip64EocdlBuffer.writeUInt32LE(0x07064b50, 0);
   // number of the disk with the start of the zip64 end of central directory  4 bytes
@@ -376,11 +376,11 @@ function validateMetadataPath(metadataPath, isDirectory) {
   return metadataPath;
 }
 
-var EMPTY_BUFFER = Buffer.allocUnsafe(0);
+var EMPTY_BUFFER = bufferAlloc(0);
 
 // this class is not part of the public API
 function Entry(metadataPath, isDirectory, options) {
-  this.utf8FileName = Buffer.from(metadataPath);
+  this.utf8FileName = bufferFrom(metadataPath);
   if (this.utf8FileName.length > 0xffff) throw new Error("utf8 file name too long. " + utf8FileName.length + " > " + 0xffff);
   this.isDirectory = isDirectory;
   this.state = Entry.WAITING_FOR_METADATA;
@@ -412,7 +412,7 @@ function Entry(metadataPath, isDirectory, options) {
   this.forceZip64Format = !!options.forceZip64Format;
   if (options.fileComment) {
     if (typeof options.fileComment === "string") {
-      this.fileComment = Buffer.from(options.fileComment, "utf-8");
+      this.fileComment = bufferFrom(options.fileComment, "utf-8");
     } else {
       // It should be a Buffer
       this.fileComment = options.fileComment;
@@ -467,7 +467,7 @@ Entry.prototype.getLocalFileHeader = function() {
     uncompressedSize = this.uncompressedSize;
   }
 
-  var fixedSizeStuff = Buffer.allocUnsafe(LOCAL_FILE_HEADER_FIXED_SIZE);
+  var fixedSizeStuff = bufferAlloc(LOCAL_FILE_HEADER_FIXED_SIZE);
   var generalPurposeBitFlag = FILE_NAME_IS_UTF8;
   if (!this.crcAndFileSizeKnown) generalPurposeBitFlag |= UNKNOWN_CRC32_AND_FILE_SIZES;
 
@@ -506,10 +506,10 @@ var ZIP64_DATA_DESCRIPTOR_SIZE = 24;
 Entry.prototype.getDataDescriptor = function() {
   if (this.crcAndFileSizeKnown) {
     // the Mac Archive Utility requires this not be present unless we set general purpose bit 3
-    return Buffer.allocUnsafe(0);
+    return EMPTY_BUFFER;
   }
   if (!this.useZip64Format()) {
-    var buffer = Buffer.allocUnsafe(DATA_DESCRIPTOR_SIZE);
+    var buffer = bufferAlloc(DATA_DESCRIPTOR_SIZE);
     // optional signature (required according to Archive Utility)
     buffer.writeUInt32LE(0x08074b50, 0);
     // crc-32                          4 bytes
@@ -521,7 +521,7 @@ Entry.prototype.getDataDescriptor = function() {
     return buffer;
   } else {
     // ZIP64 format
-    var buffer = Buffer.allocUnsafe(ZIP64_DATA_DESCRIPTOR_SIZE);
+    var buffer = bufferAlloc(ZIP64_DATA_DESCRIPTOR_SIZE);
     // optional signature (unknown if anyone cares about this)
     buffer.writeUInt32LE(0x08074b50, 0);
     // crc-32                          4 bytes
@@ -536,7 +536,7 @@ Entry.prototype.getDataDescriptor = function() {
 var CENTRAL_DIRECTORY_RECORD_FIXED_SIZE = 46;
 var ZIP64_EXTENDED_INFORMATION_EXTRA_FIELD_SIZE = 28;
 Entry.prototype.getCentralDirectoryRecord = function() {
-  var fixedSizeStuff = Buffer.allocUnsafe(CENTRAL_DIRECTORY_RECORD_FIXED_SIZE);
+  var fixedSizeStuff = bufferAlloc(CENTRAL_DIRECTORY_RECORD_FIXED_SIZE);
   var generalPurposeBitFlag = FILE_NAME_IS_UTF8;
   if (!this.crcAndFileSizeKnown) generalPurposeBitFlag |= UNKNOWN_CRC32_AND_FILE_SIZES;
 
@@ -552,7 +552,7 @@ Entry.prototype.getCentralDirectoryRecord = function() {
     versionNeededToExtract = VERSION_NEEDED_TO_EXTRACT_ZIP64;
 
     // ZIP64 extended information extra field
-    zeiefBuffer = Buffer.allocUnsafe(ZIP64_EXTENDED_INFORMATION_EXTRA_FIELD_SIZE);
+    zeiefBuffer = bufferAlloc(ZIP64_EXTENDED_INFORMATION_EXTRA_FIELD_SIZE);
     // 0x0001                  2 bytes    Tag for this "extra" block type
     zeiefBuffer.writeUInt16LE(0x0001, 0);
     // Size                    2 bytes    Size of this "extra" block
@@ -567,7 +567,7 @@ Entry.prototype.getCentralDirectoryRecord = function() {
     // (omit)
   } else {
     versionNeededToExtract = VERSION_NEEDED_TO_EXTRACT_UTF8;
-    zeiefBuffer = Buffer.allocUnsafe(0);
+    zeiefBuffer = EMPTY_BUFFER;
   }
 
   // central file header signature   4 bytes  (0x02014b50)
@@ -674,7 +674,7 @@ var reverseCp437 = null;
 function encodeCp437(string) {
   if (/^[\x20-\x7e]*$/.test(string)) {
     // CP437, ASCII, and UTF-8 overlap in this range.
-    return Buffer.from(string, "utf-8");
+    return bufferFrom(string, "utf-8");
   }
 
   // This is the slow path.
@@ -686,7 +686,7 @@ function encodeCp437(string) {
     }
   }
 
-  var result = Buffer.allocUnsafe(string.length);
+  var result = bufferAlloc(string.length);
   for (var i = 0; i < string.length; i++) {
     var b = reverseCp437[string[i]];
     if (b == null) throw new Error("character not encodable in CP437: " + JSON.stringify(string[i]));
@@ -694,4 +694,56 @@ function encodeCp437(string) {
   }
 
   return result;
+}
+
+function bufferAlloc(size) {
+  bufferAlloc = modern;
+  try {
+    return bufferAlloc(size);
+  } catch (e) {
+    bufferAlloc = legacy;
+    return bufferAlloc(size);
+  }
+  function modern(size) {
+    return Buffer.allocUnsafe(size);
+  }
+  function legacy(size) {
+    return new Buffer(size);
+  }
+}
+function bufferFrom(something, encoding) {
+  bufferFrom = modern;
+  try {
+    return bufferFrom(something, encoding);
+  } catch (e) {
+    bufferFrom = legacy;
+    return bufferFrom(something, encoding);
+  }
+  function modern(something, encoding) {
+    return Buffer.from(something, encoding);
+  }
+  function legacy(something, encoding) {
+    return new Buffer(something, encoding);
+  }
+}
+function bufferIncludes(buffer, content) {
+  bufferIncludes = modern;
+  try {
+    return bufferIncludes(buffer, content);
+  } catch (e) {
+    bufferIncludes = legacy;
+    return bufferIncludes(buffer, content);
+  }
+  function modern(buffer, content) {
+    return buffer.includes(content);
+  }
+  function legacy(buffer, content) {
+    for (var i = 0; i <= buffer.length - content.length; i++) {
+      for (var j = 0;; j++) {
+        if (j === content.length) return true;
+        if (buffer[i + j] !== content[j]) break;
+      }
+    }
+    return false;
+  }
 }
