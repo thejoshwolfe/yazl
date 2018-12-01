@@ -57,7 +57,7 @@ var BufferList = require("bl");
     options.forceZip64Format = !!zip64Config[1];
     zipfile.addFile(__filename, "fdsa.txt", options);
     options.forceZip64Format = !!zip64Config[2];
-    zipfile.addBuffer(Buffer.from("buffer"), "buffer.txt", options);
+    zipfile.addBuffer(bufferFrom("buffer"), "buffer.txt", options);
     options.forceZip64Format = !!zip64Config[3];
     options.size = "stream".length;
     zipfile.addReadStream(new BufferList().append("stream"), "stream.txt", options);
@@ -76,7 +76,7 @@ var BufferList = require("bl");
   var zipfile = new yazl.ZipFile();
   // all options parameters are optional
   zipfile.addFile(__filename, "a.txt");
-  zipfile.addBuffer(Buffer.from("buffer"), "b.txt");
+  zipfile.addBuffer(bufferFrom("buffer"), "b.txt");
   zipfile.addReadStream(new BufferList().append("stream"), "c.txt");
   zipfile.addEmptyDirectory("d/");
   zipfile.addEmptyDirectory("e");
@@ -104,7 +104,7 @@ var BufferList = require("bl");
 (function() {
   var zipfile = new yazl.ZipFile();
   // all options parameters are optional
-  zipfile.addBuffer(Buffer.from("hello"), "hello.txt", {compress: false});
+  zipfile.addBuffer(bufferFrom("hello"), "hello.txt", {compress: false});
   zipfile.end(function(finalSize) {
     if (finalSize === -1) throw new Error("finalSize should be known");
     zipfile.outputStream.pipe(new BufferList(function(err, data) {
@@ -131,7 +131,7 @@ var weirdChars = '\u0000☺☻♥♦♣♠•◘○◙♂♀♪♫☼►◄↕�
 (function() {
   var testCases = [
     ["Hello World", "Hello World"],
-    [Buffer.from("Hello"), "Hello"],
+    [bufferFrom("Hello"), "Hello"],
     [weirdChars, weirdChars],
   ];
   testCases.forEach(function(testCase, i) {
@@ -159,10 +159,10 @@ var weirdChars = '\u0000☺☻♥♦♣♠•◘○◙♂♀♪♫☼►◄↕�
   var zipfile = new yazl.ZipFile();
   try {
     zipfile.end({
-      comment: Buffer.from("\x50\x4b\x05\x06" + "01234567890123456789")
+      comment: bufferFrom("01234567890123456789" + "\x50\x4b\x05\x06" + "01234567890123456789")
     });
   } catch (e) {
-    if (e.toString().indexOf("comment contains end of central directory record signature")) {
+    if (e.toString().indexOf("comment contains end of central directory record signature") !== -1) {
       console.log("block eocdr signature in comment: pass");
       return;
     }
@@ -173,13 +173,13 @@ var weirdChars = '\u0000☺☻♥♦♣♠•◘○◙♂♀♪♫☼►◄↕�
 (function() {
   var testCases = [
     ["Hello World!", "Hello World!"],
-    [Buffer.from("Hello!"), "Hello!"],
+    [bufferFrom("Hello!"), "Hello!"],
     [weirdChars, weirdChars],
   ];
   testCases.forEach(function(testCase, i) {
     var zipfile = new yazl.ZipFile();
     // all options parameters are optional
-    zipfile.addBuffer(Buffer.from("hello"), "hello.txt", {compress: false, fileComment: testCase[0]});
+    zipfile.addBuffer(bufferFrom("hello"), "hello.txt", {compress: false, fileComment: testCase[0]});
     zipfile.end(function(finalSize) {
       if (finalSize === -1) throw new Error("finalSize should be known");
       zipfile.outputStream.pipe(new BufferList(function(err, data) {
@@ -202,3 +202,19 @@ var weirdChars = '\u0000☺☻♥♦♣♠•◘○◙♂♀♪♫☼►◄↕�
     });
   });
 })();
+
+function bufferFrom(something, encoding) {
+  bufferFrom = modern;
+  try {
+    return bufferFrom(something, encoding);
+  } catch (e) {
+    bufferFrom = legacy;
+    return bufferFrom(something, encoding);
+  }
+  function modern(something, encoding) {
+    return Buffer.from(something, encoding);
+  }
+  function legacy(something, encoding) {
+    return new Buffer(something, encoding);
+  }
+}
