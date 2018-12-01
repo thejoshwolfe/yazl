@@ -353,6 +353,8 @@ Instead, each of the fields is limited to 65,535 bytes due to the length of each
 
 ## Change History
 
+ * 2.5.1
+   * Fix support for old versions of Node and add official support for Node versions 0.10, 4, 6, 8, 10. [pull #49](https://github.com/thejoshwolfe/yazl/pull/49)
  * 2.5.0
    * Add support for `comment` and `fileComment`. [pull #44](https://github.com/thejoshwolfe/yazl/pull/44)
    * Avoid `new Buffer()`. [pull #43](https://github.com/thejoshwolfe/yazl/pull/43)
