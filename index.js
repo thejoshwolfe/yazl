@@ -72,6 +72,7 @@ ZipFile.prototype.addBuffer = function(buffer, metadataPath, options) {
     setCompressedBuffer(buffer);
   } else {
     zlib.deflateRaw(buffer, function(err, compressedBuffer) {
+      self.emit("entry", metadataPath);
       setCompressedBuffer(compressedBuffer);
     });
   }
@@ -100,6 +101,7 @@ ZipFile.prototype.addEmptyDirectory = function(metadataPath, options) {
   if (options.compress != null) throw new Error("options.compress not allowed");
   var entry = new Entry(metadataPath, true, options);
   self.entries.push(entry);
+  self.emit("entry", metadataPath);
   entry.setFileDataPumpFunction(function() {
     writeToOutputStream(self, entry.getDataDescriptor());
     entry.state = Entry.FILE_DATA_DONE;
@@ -147,6 +149,9 @@ function pumpFileDataReadStream(self, entry, readStream) {
   var uncompressedSizeCounter = new ByteCounter();
   var compressor = entry.compress ? new zlib.DeflateRaw() : new PassThrough();
   var compressedSizeCounter = new ByteCounter();
+  readStream.on("end", function() {
+    self.emit("entry", String(entry.utf8FileName));
+  });
   readStream.pipe(crc32Watcher)
             .pipe(uncompressedSizeCounter)
             .pipe(compressor)
