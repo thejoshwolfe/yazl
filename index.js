@@ -422,6 +422,9 @@ function Entry(metadataPath, isDirectory, options) {
     // no comment.
     this.fileComment = EMPTY_BUFFER;
   }
+  if (options.extraFields) {
+    this.extraFields = options.extraFields;
+  }
 }
 Entry.WAITING_FOR_METADATA = 0;
 Entry.READY_TO_PUMP_FILE_DATA = 1;
@@ -570,6 +573,17 @@ Entry.prototype.getCentralDirectoryRecord = function() {
     zeiefBuffer = EMPTY_BUFFER;
   }
 
+  // Serialize any extra tagged fields.
+  var extraFieldsBuffer = bufferAlloc(0);
+  if (this.extraFields) {
+    this.extraFields.forEach(function(extraField) {
+      var tagBuffer = bufferAlloc(4);
+      tagBuffer.writeUInt16LE(extraField.id, 0);
+      tagBuffer.writeUInt16LE(extraField.data.length, 2);
+      extraFieldsBuffer = Buffer.concat([extraFieldsBuffer, tagBuffer, extraField.data]);
+    });
+  }
+
   // central file header signature   4 bytes  (0x02014b50)
   fixedSizeStuff.writeUInt32LE(0x02014b50, 0);
   // version made by                 2 bytes
@@ -593,7 +607,7 @@ Entry.prototype.getCentralDirectoryRecord = function() {
   // file name length                2 bytes
   fixedSizeStuff.writeUInt16LE(this.utf8FileName.length, 28);
   // extra field length              2 bytes
-  fixedSizeStuff.writeUInt16LE(zeiefBuffer.length, 30);
+  fixedSizeStuff.writeUInt16LE(zeiefBuffer.length + extraFieldsBuffer.length, 30);
   // file comment length             2 bytes
   fixedSizeStuff.writeUInt16LE(this.fileComment.length, 32);
   // disk number start               2 bytes
@@ -609,8 +623,10 @@ Entry.prototype.getCentralDirectoryRecord = function() {
     fixedSizeStuff,
     // file name (variable size)
     this.utf8FileName,
-    // extra field (variable size)
+    // zip64 extra field (variable size)
     zeiefBuffer,
+    // other extra fields (variable size)
+    extraFieldsBuffer,
     // file comment (variable size)
     this.fileComment,
   ]);

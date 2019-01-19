@@ -67,6 +67,7 @@ After UTF-8 encoding, `metadataPath` must be at most `0xffff` bytes in length.
   mode: stats.mode,
   compress: true,
   forceZip64Format: false,
+  extraFields: [],
   fileComment: "", // or a UTF-8 Buffer
 }
 ```
@@ -84,6 +85,8 @@ If `compress` is `false`, the file data will be stored (compression method 0).
 If `forceZip64Format` is `true`, yazl will use ZIP64 format in this entry's Data Descriptor
 and Central Directory Record regardless of if it's required or not (this may be useful for testing.).
 Otherwise, yazl will use ZIP64 format where necessary.
+
+Each entry in `extraFields` should be tagged data of the form `{id: id, data: data}`. See the [`yauzl` docs](https://github.com/thejoshwolfe/yauzl#extrafields) for more.
 
 If `fileComment` is a `string`, it will be encoded with UTF-8.
 If `fileComment` is a `Buffer`, it should be a UTF-8 encoded string.
@@ -107,12 +110,13 @@ See `addFile()` for info about the `metadataPath` parameter.
   mode: 0o100664,
   compress: true,
   forceZip64Format: false,
+  extraFields: [],
   fileComment: "", // or a UTF-8 Buffer
   size: 12345, // example value
 }
 ```
 
-See `addFile()` for the meaning of `mtime`, `mode`, `compress`, `forceZip64Format`, and `fileComment`.
+See `addFile()` for the meaning of `mtime`, `mode`, `compress`, `forceZip64Format`, `extraFields`, and `fileComment`.
 If `size` is given, it will be checked against the actual number of bytes in the `readStream`,
 and an error will be emitted if there is a mismatch.
 
@@ -132,11 +136,12 @@ See `addFile()` for info about the `metadataPath` parameter.
   mode: 0o100664,
   compress: true,
   forceZip64Format: false,
+  extraFields: [],
   fileComment: "", // or a UTF-8 Buffer
 }
 ```
 
-See `addFile()` for the meaning of `mtime`, `mode`, `compress`, `forceZip64Format`, and `fileComment`.
+See `addFile()` for the meaning of `mtime`, `mode`, `compress`, `forceZip64Format`, `extraFields`, and `fileComment`.
 
 This method has the unique property that General Purpose Bit `3` will not be used in the Local File Header.
 This doesn't matter for unzip implementations that conform to the Zip File Spec.
