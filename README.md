@@ -150,6 +150,37 @@ you must use `addBuffer()` instead of `addFile()` or `addReadStream()` for all e
 Note that even when yazl provides the file sizes in the Local File Header,
 yazl never uses ZIP64 format for Local File Headers due to the size limit on `buffer` (see below).
 
+#### addDeflatedBuffer(compressedBuffer, metadataPath, options)
+
+Adds an already deflated file to the zip file.
+See below for info on the limitations on the size of `buffer`.
+See `addFile()` for info about the `metadataPath` parameter.
+`options` some options are required and has the following structure and default values:
+
+**required options**
+```js
+{
+  crc32: 1234, // the crc32 of the uncompressed data
+  uncompressedSize: 123,
+}
+```
+
+**default options**
+```js
+{
+  mode: 0o100664,
+  mtime: new Date(),
+  forceZip64Format: false,
+  fileComment: "", // or a UTF-8 Buffer
+}
+```
+
+See `addFile()` for the meaning of `mtime`, `mode`, `compress`, `forceZip64Format`, and `fileComment`.
+
+This method can be used to allow adding already deflated buffers created with `zlib#deflate` to the zip file. This is useful when you want to create multiple zip files with some files common between them. It can speed up compression time drastically when the common files are very large or there are a lot of them.
+
+The `crc32` of the uncompressed buffer can be calculated using `buffer-crc32#unsigned`.
+
 ##### Size limitation on buffer
 
 In order to require the ZIP64 format for a local file header,

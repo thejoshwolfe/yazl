@@ -92,6 +92,43 @@ ZipFile.prototype.addBuffer = function(buffer, metadataPath, options) {
   }
 };
 
+ZipFile.prototype.addDeflatedBuffer = function(compressedBuffer, metadataPath, options) {
+  var self = this;
+  if (typeof options.uncompressedSize !== 'number') {
+    throw new Error('options.uncompressedSize is required')
+  }
+  if (typeof options.crc32 !== 'number') {
+    throw new Error('options.crc32 is required')
+  }
+  if (compressedBuffer.length > 0x3fffffff) {
+    throw new Error("buffer too large: " + buffer.length + " > " + 0x3fffffff);
+  }
+  metadataPath = validateMetadataPath(metadataPath, false)
+  var entry = new Entry(metadataPath, false, {
+    mode: options.mode,
+    mtime: options.mtime,
+    fileComment: options.fileComment,
+  })
+  entry.crc32 = options.crc32;
+  entry.crcAndFileSizeKnown = true;
+  entry.compressedSize = compressedBuffer.length;
+  entry.uncompressedSize = options.uncompressedSize;
+  self.entries.push(entry);
+
+  entry.setFileDataPumpFunction(function() {
+    writeToOutputStream(self, compressedBuffer);
+    writeToOutputStream(self, entry.getDataDescriptor());
+    entry.state = Entry.FILE_DATA_DONE;
+
+    // don't call pumpEntries() recursively.
+    // (also, don't call process.nextTick recursively.)
+    setImmediate(function() {
+      pumpEntries(self);
+    });
+  });
+  pumpEntries(self);
+}
+
 ZipFile.prototype.addEmptyDirectory = function(metadataPath, options) {
   var self = this;
   metadataPath = validateMetadataPath(metadataPath, true);
