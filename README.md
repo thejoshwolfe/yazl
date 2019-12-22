@@ -1,7 +1,9 @@
 # yazl
 
-[![Build Status](https://travis-ci.com/thejoshwolfe/yazl.svg?branch=master)](https://travis-ci.com/thejoshwolfe/yazl)
-[![Coverage Status](https://coveralls.io/repos/github/thejoshwolfe/yazl/badge.svg?branch=master)](https://coveralls.io/github/thejoshwolfe/yazl?branch=master)
+[![Build Status](https://img.shields.io/travis/com/thejoshwolfe/yazl?style=flat-square)](https://travis-ci.com/thejoshwolfe/yazl)
+[![Coverage Status](https://img.shields.io/coveralls/github/thejoshwolfe/yazl?style=flat-square)](https://coveralls.io/github/thejoshwolfe/yazl?branch=master)
+[![NPM Weekly Downloads](https://img.shields.io/npm/dw/yazl?style=flat-square)](https://www.npmjs.com/package/yazl)
+[![NPM Version](https://img.shields.io/npm/v/yazl?style=flat-square)](https://www.npmjs.com/package/yazl)
 
 yet another zip library for node. For unzipping, see
 [yauzl](https://github.com/thejoshwolfe/yauzl).
