@@ -4,9 +4,8 @@
   "description": "yet another zip library for node",
   "main": "index.js",
   "scripts": {
-    "test": "node test/test.js",
-    "test-cov": "istanbul cover test/test.js",
-    "test-travis": "istanbul cover --report lcovonly test/test.js"
+    "test": "jest --verbose",
+    "test:cov": "jest --verbose --coverage"
   },
   "repository": {
     "type": "git",
@@ -28,9 +27,17 @@
     "buffer-crc32": "~0.2.3"
   },
   "devDependencies": {
-    "bl": "~0.9.3",
-    "istanbul": "^0.4.5",
-    "yauzl": "~2.3.1"
+    "@babel/plugin-proposal-class-properties": "^7.7.4",
+    "@babel/plugin-proposal-numeric-separator": "^7.7.4",
+    "@babel/plugin-transform-runtime": "^7.7.6",
+    "@babel/preset-env": "^7.7.7",
+    "@babel/runtime": "^7.7.7",
+    "@types/bl": "^2.1.0",
+    "@types/jest": "^24.0.24",
+    "@types/yauzl": "^2.9.1",
+    "bl": "~4.0.0",
+    "jest": "^24.9.0",
+    "yauzl": "~2.10.0"
   },
   "files": [
     "index.js"

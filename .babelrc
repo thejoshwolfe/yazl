@@ -1,0 +1,17 @@
+{
+    "presets": [
+        [ "@babel/env",
+            {
+                "targets": {
+                    "esmodules": true,
+                    "node": true
+                }
+            }
+        ]
+    ],
+    "plugins": [
+        "@babel/plugin-proposal-numeric-separator",
+        "@babel/proposal-class-properties",
+        "@babel/plugin-transform-runtime"
+    ]
+}
