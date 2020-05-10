@@ -388,7 +388,7 @@ function Entry(metadataPath, isDirectory, options) {
   if (options.mode != null) {
     this.setFileAttributesMode(options.mode);
   } else {
-    this.setFileAttributesMode(isDirectory ? 0o40775 : 0o100664);
+    this.setFileAttributesMode(isDirectory ? parseInt('40775', 8) : parseInt('100664', 8));
   }
   if (isDirectory) {
     this.crcAndFileSizeKnown = true;
