@@ -28,7 +28,7 @@
     "buffer-crc32": "~0.2.3"
   },
   "devDependencies": {
-    "bl": "~0.9.3",
+    "bl": "~4.0.3",
     "istanbul": "^0.4.5",
     "yauzl": "~2.3.1"
   },
