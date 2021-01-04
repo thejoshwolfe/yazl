@@ -1,10 +1,13 @@
 var fs = require("fs");
 var Transform = require("stream").Transform;
 var PassThrough = require("stream").PassThrough;
+var BufferConstants = require("buffer").constants;
 var zlib = require("zlib");
 var util = require("util");
 var EventEmitter = require("events").EventEmitter;
 var crc32 = require("buffer-crc32");
+
+const MAX_BUFFER_LENGTH = BufferConstants ? BufferConstants.MAX_LENGTH : 0x3fffffff;
 
 exports.ZipFile = ZipFile;
 exports.dateToDosDateTime = dateToDosDateTime;
@@ -60,7 +63,7 @@ ZipFile.prototype.addReadStream = function(readStream, metadataPath, options) {
 ZipFile.prototype.addBuffer = function(buffer, metadataPath, options) {
   var self = this;
   metadataPath = validateMetadataPath(metadataPath, false);
-  if (buffer.length > 0x3fffffff) throw new Error("buffer too large: " + buffer.length + " > " + 0x3fffffff);
+  if (buffer.length > MAX_BUFFER_LENGTH) throw new Error("buffer too large: " + buffer.length + " > " + MAX_BUFFER_LENGTH);
   if (options == null) options = {};
   if (options.size != null) throw new Error("options.size not allowed");
   var entry = new Entry(metadataPath, false, options);
