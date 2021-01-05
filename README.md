@@ -179,7 +179,7 @@ If `metadataPath` does not end with a `"/"`, a `"/"` will be appended.
 ```js
 {
   mtime: new Date(),
-  mode: 040775,
+  mode: 0o40775
 }
 ```
 
