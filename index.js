@@ -53,9 +53,7 @@ ZipFile.prototype.addStreamCreator = function(creator, metadataPath, options) {
    entry.setFileDataPumpFunction(async function() {
       creator(metadataPath).then((stream) => {
          entry.state = Entry.FILE_DATA_IN_PROGRESS;
-         console.log(`Starting to pump ${metadataPath}`);
          pumpFileDataReadStream(self, entry, stream);
-         //pumpEntries(self);
       });
    });
  };
