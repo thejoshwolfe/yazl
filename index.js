@@ -44,6 +44,22 @@ ZipFile.prototype.addFile = function(realPath, metadataPath, options) {
   });
 };
 
+ZipFile.prototype.addStreamCreator = function(creator, metadataPath, options) {
+   var self = this;
+   metadataPath = validateMetadataPath(metadataPath, false);
+   if (options == null) options = {};
+   var entry = new Entry(metadataPath, false, options);
+   self.entries.push(entry);
+   entry.setFileDataPumpFunction(async function() {
+      creator(metadataPath).then((stream) => {
+         entry.state = Entry.FILE_DATA_IN_PROGRESS;
+         console.log(`Starting to pump ${metadataPath}`);
+         pumpFileDataReadStream(self, entry, stream);
+         //pumpEntries(self);
+      });
+   });
+ };
+
 ZipFile.prototype.addReadStream = function(readStream, metadataPath, options) {
   var self = this;
   metadataPath = validateMetadataPath(metadataPath, false);
