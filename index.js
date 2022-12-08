@@ -668,10 +668,12 @@ Crc32Watcher.prototype._transform = function(chunk, encoding, cb) {
 };
 
 var cp437 = '\u0000☺☻♥♦♣♠•◘○◙♂♀♪♫☼►◄↕‼¶§▬↨↑↓→←∟↔▲▼ !"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~⌂ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥₧ƒáíóúñÑªº¿⌐¬½¼¡«»░▒▓│┤╡╢╖╕╣║╗╝╜╛┐└┴┬├─┼╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪┘┌█▄▌▐▀αßΓπΣσµτΦΘΩδ∞φε∩≡±≥≤⌠⌡÷≈°∙·√ⁿ²■ ';
-if (cp437.length !== 256) throw new Error("assertion failure");
+
 var reverseCp437 = null;
 
 function encodeCp437(string) {
+  if (cp437.length !== 256) throw new Error("assertion failure");
+
   if (/^[\x20-\x7e]*$/.test(string)) {
     // CP437, ASCII, and UTF-8 overlap in this range.
     return bufferFrom(string, "utf-8");
