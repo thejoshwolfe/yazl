@@ -1,3 +1,8 @@
+# ARCHIVAL NOTICE
+
+> [!NOTE]
+> This repo has been archived with the library moved to the [Virtru js-lib-monorepo](https://github.com/virtru-corp/js-lib-monorepo).
+
 # yazl
 
 [![Build Status](https://travis-ci.com/thejoshwolfe/yazl.svg?branch=master)](https://travis-ci.com/thejoshwolfe/yazl)
