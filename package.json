@@ -4,9 +4,7 @@
   "description": "yet another zip library for node",
   "main": "index.js",
   "scripts": {
-    "test": "node test/test.js",
-    "test-cov": "istanbul cover test/test.js",
-    "test-travis": "istanbul cover --report lcovonly test/test.js"
+    "test": "node test/test.js"
   },
   "repository": {
     "type": "git",
@@ -29,7 +27,6 @@
   },
   "devDependencies": {
     "bl": "~0.9.3",
-    "istanbul": "^0.4.5",
     "yauzl": "~2.3.1"
   },
   "files": [

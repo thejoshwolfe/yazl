@@ -1,8 +1,5 @@
 # yazl
 
-[![Build Status](https://travis-ci.com/thejoshwolfe/yazl.svg?branch=master)](https://travis-ci.com/thejoshwolfe/yazl)
-[![Coverage Status](https://coveralls.io/repos/github/thejoshwolfe/yazl/badge.svg?branch=master)](https://coveralls.io/github/thejoshwolfe/yazl?branch=master)
-
 yet another zip library for node. For unzipping, see
 [yauzl](https://github.com/thejoshwolfe/yauzl).
 
@@ -82,7 +79,7 @@ If `compress` is `true`, the file data will be deflated (compression method 8).
 If `compress` is `false`, the file data will be stored (compression method 0).
 
 If `forceZip64Format` is `true`, yazl will use ZIP64 format in this entry's Data Descriptor
-and Central Directory Record regardless of if it's required or not (this may be useful for testing.).
+and Central Directory Record even if not needed (this may be useful for testing.).
 Otherwise, yazl will use ZIP64 format where necessary.
 
 If `fileComment` is a `string`, it will be encoded with UTF-8.
@@ -200,8 +197,7 @@ and causes the eventual close of `outputStream`.
 ```
 
 If `forceZip64Format` is `true`, yazl will include the ZIP64 End of Central Directory Locator
-and ZIP64 End of Central Directory Record regardless of whether or not they are required
-(this may be useful for testing.).
+and ZIP64 End of Central Directory Record even if not needed (this may be useful for testing.).
 Otherwise, yazl will include these structures if necessary.
 
 If `comment` is a `string`, it will be encoded with CP437.
@@ -224,8 +220,12 @@ or the guaranteed eventual size in bytes of the output data that can be read fro
 Note that `finalSizeCallback` is usually called well before `outputStream` has piped all its data;
 this callback does not mean that the stream is done.
 
+(The `finalSizeCallback` feature was added to this library to support the use case of a web server constructing a zip file dynamically
+and serving it without buffering the contents on disk or in ram.
+`finalSize` can become the `Content-Length` header before piping the `outputStream` as the response body.)
+
 If `finalSize` is `-1`, it means means the final size is too hard to guess before processing the input file data.
-This will happen if and only if the `compress` option is `true` on any call to `addFile()`, `addReadStream()`, or `addBuffer()`,
+This will happen if and only if the `compress` option is `true` on any call to `addFile()`, `addReadStream()`, `addBuffer()`, or `addEmptyDirectory()`,
 or if `addReadStream()` is called and the optional `size` option is not given.
 In other words, clients should know whether they're going to get a `-1` or a real value
 by looking at how they are using this library.
@@ -243,7 +243,7 @@ It is typical to pipe this stream to a writable stream created from `fs.createWr
 Internally, large amounts of file data are piped to `outputStream` using `pipe()`,
 which means throttling happens appropriately when this stream is piped to a slow destination.
 
-Data becomes available in this stream soon after calling one of `addFile()`, `addReadStream()`, or `addBuffer()`.
+Data becomes available in this stream soon after calling one of `addFile()`, `addReadStream()`, `addBuffer()`, or `addEmptyDirectory()`.
 Clients can call `pipe()` on this stream at any time,
 such as immediately after getting a new `ZipFile` instance, or long after calling `end()`.
 
@@ -308,7 +308,7 @@ it is impossible to know the crc32 before processing the file data.
 When bit `3` is set, data Descriptors are given after each file data with this information, as per the spec.
 But remember a complete metadata listing is still always available in the central directory record,
 so if unzip implementations are relying on that, like they should,
-none of this paragraph will matter anyway.
+none of this paragraph will matter.
 Even so, some popular unzip implementations do not follow the spec.
 The Mac Archive Utility requires Data Descriptors to include the optional signature,
 so yazl includes the optional data descriptor signature.
