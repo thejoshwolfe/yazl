@@ -353,37 +353,39 @@ Instead, each of the fields is limited to 65,535 bytes due to the length of each
 
 ## Change History
 
- * 2.5.1
-   * Fix support for old versions of Node and add official support for Node versions 0.10, 4, 6, 8, 10. [pull #49](https://github.com/thejoshwolfe/yazl/pull/49)
- * 2.5.0
-   * Add support for `comment` and `fileComment`. [pull #44](https://github.com/thejoshwolfe/yazl/pull/44)
-   * Avoid `new Buffer()`. [pull #43](https://github.com/thejoshwolfe/yazl/pull/43)
- * 2.4.3
-   * Clarify readme. [pull #33](https://github.com/thejoshwolfe/yazl/pull/33)
- * 2.4.2
-   * Remove octal literals to make yazl compatible with strict mode. [pull #28](https://github.com/thejoshwolfe/yazl/pull/28)
- * 2.4.1
-   * Fix Mac Archive Utility compatibility issue. [issue #24](https://github.com/thejoshwolfe/yazl/issues/24)
- * 2.4.0
-   * Add ZIP64 support. [issue #6](https://github.com/thejoshwolfe/yazl/issues/6)
- * 2.3.1
-   * Remove `.npmignore` from npm package. [pull #22](https://github.com/thejoshwolfe/yazl/pull/22)
- * 2.3.0
-   * `metadataPath` can have `\` characters now; they will be replaced with `/`. [issue #18](https://github.com/thejoshwolfe/yazl/issues/18)
- * 2.2.2
-   * Fix 7-Zip compatibility issue. [pull request #17](https://github.com/thejoshwolfe/yazl/pull/17)
- * 2.2.1
-   * Fix Mac Archive Utility compatibility issue. [issue #14](https://github.com/thejoshwolfe/yazl/issues/14)
- * 2.2.0
-   * Avoid using general purpose bit 3 for `addBuffer()` calls. [issue #13](https://github.com/thejoshwolfe/yazl/issues/13)
- * 2.1.3
-   * Fix bug when only addBuffer() and end() are called. [issue #12](https://github.com/thejoshwolfe/yazl/issues/12)
- * 2.1.2
-   * Fixed typo in parameter validation. [pull request #10](https://github.com/thejoshwolfe/yazl/pull/10)
- * 2.1.1
-   * Fixed stack overflow when using addBuffer() in certain ways. [issue #9](https://github.com/thejoshwolfe/yazl/issues/9)
- * 2.1.0
-   * Added `addEmptyDirectory()`.
-   * `options` is now optional for `addReadStream()` and `addBuffer()`.
- * 2.0.0
-   * Initial release.
+* 3.0.0 (2024-Oct-18)
+    * Upgrade dependencies. This indirectly drops support for older versions of node.
+* 2.5.1 (2018-Nov-30)
+    * Fix support for old versions of Node and add official support for Node versions 0.10, 4, 6, 8, 10. [pull #49](https://github.com/thejoshwolfe/yazl/pull/49)
+* 2.5.0 (2018-Nov-15)
+    * Add support for `comment` and `fileComment`. [pull #44](https://github.com/thejoshwolfe/yazl/pull/44)
+    * Avoid `new Buffer()`. [pull #43](https://github.com/thejoshwolfe/yazl/pull/43)
+* 2.4.3 (2017-Oct-30)
+    * Clarify readme. [pull #33](https://github.com/thejoshwolfe/yazl/pull/33)
+* 2.4.2 (2016-Oct-26)
+    * Remove octal literals to make yazl compatible with strict mode. [pull #28](https://github.com/thejoshwolfe/yazl/pull/28)
+* 2.4.1 (2016-Jun-30)
+    * Fix Mac Archive Utility compatibility issue. [issue #24](https://github.com/thejoshwolfe/yazl/issues/24)
+* 2.4.0 (2016-Jun-26)
+    * Add ZIP64 support. [issue #6](https://github.com/thejoshwolfe/yazl/issues/6)
+* 2.3.1 (2016-May-09)
+    * Remove `.npmignore` from npm package. [pull #22](https://github.com/thejoshwolfe/yazl/pull/22)
+* 2.3.0 (2015-Dec-23)
+    * `metadataPath` can have `\` characters now; they will be replaced with `/`. [issue #18](https://github.com/thejoshwolfe/yazl/issues/18)
+* 2.2.2 (2015-May-07)
+    * Fix 7-Zip compatibility issue. [pull request #17](https://github.com/thejoshwolfe/yazl/pull/17)
+* 2.2.1 (2015-Mar-27)
+    * Fix Mac Archive Utility compatibility issue. [issue #14](https://github.com/thejoshwolfe/yazl/issues/14)
+* 2.2.0 (2015-Mar-21)
+    * Avoid using general purpose bit 3 for `addBuffer()` calls. [issue #13](https://github.com/thejoshwolfe/yazl/issues/13)
+* 2.1.3 (2015-Mar-20)
+    * Fix bug when only addBuffer() and end() are called. [issue #12](https://github.com/thejoshwolfe/yazl/issues/12)
+* 2.1.2 (2015-Mar-03)
+    * Fixed typo in parameter validation. [pull request #10](https://github.com/thejoshwolfe/yazl/pull/10)
+* 2.1.1 (2015-Mar-01)
+    * Fixed stack overflow when using addBuffer() in certain ways. [issue #9](https://github.com/thejoshwolfe/yazl/issues/9)
+* 2.1.0 (2015-Jan-16)
+    * Added `addEmptyDirectory()`.
+    * `options` is now optional for `addReadStream()` and `addBuffer()`.
+* 2.0.0 (2014-Sep-24)
+    * Initial release.
