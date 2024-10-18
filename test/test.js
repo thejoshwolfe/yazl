@@ -17,14 +17,14 @@ var BufferList = require("bl");
   zipfile.addBuffer(expectedContents, "with\\windows-paths.txt", fileMetadata);
   zipfile.end(function(finalSize) {
     if (finalSize !== -1) throw new Error("finalSize is impossible to know before compression");
-    zipfile.outputStream.pipe(new BufferList(function(err, data) {
+    zipfile.outputStream.pipe(BufferList(function(err, data) {
       if (err) throw err;
       yauzl.fromBuffer(data, function(err, zipfile) {
         if (err) throw err;
         zipfile.on("entry", function(entry) {
           zipfile.openReadStream(entry, function(err, readStream) {
             if (err) throw err;
-            readStream.pipe(new BufferList(function(err, data) {
+            readStream.pipe(BufferList(function(err, data) {
               if (err) throw err;
               if (expectedContents.toString("binary") !== data.toString("binary")) throw new Error("unexpected contents");
               console.log(entry.fileName + ": pass");
