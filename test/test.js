@@ -4,17 +4,21 @@ var yauzl = require("yauzl");
 var BufferList = require("bl");
 
 (function() {
-  var fileMetadata = {
+  var options = {
     mtime: new Date(),
     mode: 0100664,
+    extraFields: [{
+      id: 0x7875,
+      data: new Buffer([1,4,232,3,0,0,4,232,3,0,0]),
+    }]
   };
   var zipfile = new yazl.ZipFile();
   zipfile.addFile(__filename, "unicōde.txt");
   zipfile.addFile(__filename, "without-compression.txt", {compress: false});
-  zipfile.addReadStream(fs.createReadStream(__filename), "readStream.txt", fileMetadata);
+  zipfile.addReadStream(fs.createReadStream(__filename), "readStream.txt", options);
   var expectedContents = fs.readFileSync(__filename);
-  zipfile.addBuffer(expectedContents, "with/directories.txt", fileMetadata);
-  zipfile.addBuffer(expectedContents, "with\\windows-paths.txt", fileMetadata);
+  zipfile.addBuffer(expectedContents, "with/directories.txt", options);
+  zipfile.addBuffer(expectedContents, "with\\windows-paths.txt", options);
   zipfile.end(function(finalSize) {
     if (finalSize !== -1) throw new Error("finalSize is impossible to know before compression");
     zipfile.outputStream.pipe(BufferList(function(err, data) {
