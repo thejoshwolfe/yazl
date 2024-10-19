@@ -379,6 +379,10 @@ Instead, each of the fields is limited to 65,535 bytes due to the length of each
 
 ## Change History
 
+* 3.1.0 (2024-Oct-19)
+    * Add `addReadStreamLazy()` as a replacement for `addReadStream()`. The latter is maintained for compatibility and situational convenience. [issue #74](https://github.com/thejoshwolfe/yazl/issues/74) [pull #80](https://github.com/thejoshwolfe/yazl/pull/80)
+    * The `add*()` methods will now throw an error if you call them after calling `end()`. The documented semantics have always regarded this as undefined behavior.
+    * Some subtle and undocumented changes to error handling. Error handling isn't very well tested.
 * 3.0.1 (2024-Oct-19)
     * Change the documented name of `finalSizeCallback` to `calculatedTotalSizeCallback` to hopefully avoid confusion. [issue #71](https://github.com/thejoshwolfe/yazl/issues/71)
 * 3.0.0 (2024-Oct-18)
