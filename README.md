@@ -27,8 +27,8 @@ zipfile.outputStream.pipe(fs.createWriteStream("output.zip")).on("close", functi
   console.log("done");
 });
 // alternate apis for adding files:
-zipfile.addReadStream(process.stdin, "stdin.txt");
 zipfile.addBuffer(Buffer.from("hello"), "hello.txt");
+zipfile.addReadStreamLazy("stdin.txt", cb => cb(null, process.stdin));
 // call end() after all the files have been added
 zipfile.end();
 ```
@@ -95,7 +95,24 @@ the number of simultaneous open files is `O(1)`, probably just 1 at a time.
 #### addReadStream(readStream, metadataPath, [options])
 
 Adds a file to the zip file whose content is read from `readStream`.
-See `addFile()` for info about the `metadataPath` parameter.
+This method is effectively implemented as `this.addReadStreamLazy(metadataPath, options, cb => cb(null, readStream))`.
+
+In general, it is recommended to use `addReadStreamLazy` instead of this method
+to avoid holding a large number of system resources open for a long time.
+This method is provided for backward compatibility,
+and for convenience in cases where the `readStream` doesn't require meaningful resources to hold open and waiting.
+
+#### addReadStreamLazy(metadataPath[, options], getReadStreamFunction)
+
+Adds a file to the zip file whose content is read from a read stream obtained by calling `getReadStreamFunction(cb)`.
+`getReadStreamFunction(cb)` is called with a single callback function.
+Your implementation of `getReadStreamFunction` should eventually call `cb(err, readStream)`
+and give the `readStream` that provides the contents of the file to add to the zip file.
+If `err` is given (if it is truthy), it will be emitted from this `ZipFile` object.
+The return value from `cb` is unspecified.
+
+See `addFile()` for the meaning of the `metadataPath` parameter.
+`typeof getReadStreamFunction` must be `'function'`, which is used to determine when `options` has been omitted.
 `options` may be omitted or null and has the following structure and default values:
 
 ```js
@@ -115,6 +132,15 @@ and an error will be emitted if there is a mismatch.
 
 Note that yazl will `.pipe()` data from `readStream`, so be careful using `.on('data')`.
 In certain versions of node, `.on('data')` makes `.pipe()` behave incorrectly.
+
+Here's an example call to this method to illustrate the function callbacks:
+
+```js
+zipfile.addReadStreamLazy("path/in/archive.txt", function(cb) {
+  var readStream = getTheReadStreamSomehow();
+  cb(readStream);
+});
+```
 
 #### addBuffer(buffer, metadataPath, [options])
 
@@ -141,7 +167,7 @@ However, 7-Zip 9.20 has a known bug where General Purpose Bit `3` is declared an
 (note that it really has nothing to do with the compression method.).
 See [issue #11](https://github.com/thejoshwolfe/yazl/issues/11).
 If you would like to create zip files that 7-Zip 9.20 can understand,
-you must use `addBuffer()` instead of `addFile()` or `addReadStream()` for all entries in the zip file
+you must use `addBuffer()` instead of `addFile()`, `addReadStream()`, or `addReadStreamLazy()` for all entries in the zip file
 (and `addEmptyDirectory()` is fine too).
 
 Note that even when yazl provides the file sizes in the Local File Header,
@@ -184,7 +210,7 @@ See `addFile()` for the meaning of `mtime` and `mode`.
 
 #### end([options], [calculatedTotalSizeCallback])
 
-Indicates that no more files will be added via `addFile()`, `addReadStream()`, or `addBuffer()`,
+Indicates that no more files will be added via `addFile()`, `addReadStream()`, `addReadStreamLazy()`, `addBuffer()`, or `addEmptyDirectory()`,
 and causes the eventual close of `outputStream`.
 
 `options` may be omitted or null and has the following structure and default values:
@@ -225,8 +251,8 @@ and serving it without buffering the contents on disk or in ram.
 `calculatedTotalSize` can become the `Content-Length` header before piping the `outputStream` as the response body.)
 
 If `calculatedTotalSize` is `-1`, it means means the total size is too hard to guess before processing the input file data.
-This will happen if and only if the `compress` option is `true` on any call to `addFile()`, `addReadStream()`, `addBuffer()`, or `addEmptyDirectory()`,
-or if `addReadStream()` is called and the optional `size` option is not given.
+This will happen if and only if the `compress` option is `true` on any call to `addFile()`, `addReadStream()`, `addReadStreamLazy()`, `addBuffer()`, or `addEmptyDirectory()`,
+or if `addReadStream()` or `addReadStreamLazy()` is called and the optional `size` option is not given.
 In other words, clients should know whether they're going to get a `-1` or a real value
 by looking at how they are using this library.
 
@@ -243,7 +269,7 @@ It is typical to pipe this stream to a writable stream created from `fs.createWr
 Internally, large amounts of file data are piped to `outputStream` using `pipe()`,
 which means throttling happens appropriately when this stream is piped to a slow destination.
 
-Data becomes available in this stream soon after calling one of `addFile()`, `addReadStream()`, `addBuffer()`, or `addEmptyDirectory()`.
+Data becomes available in this stream soon after calling one of `addFile()`, `addReadStream()`, `addReadStreamLazy()`, `addBuffer()`, or `addEmptyDirectory()`.
 Clients can call `pipe()` on this stream at any time,
 such as immediately after getting a new `ZipFile` instance, or long after calling `end()`.
 
