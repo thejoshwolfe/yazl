@@ -353,6 +353,8 @@ Instead, each of the fields is limited to 65,535 bytes due to the length of each
 
 ## Change History
 
+* 3.0.1 (2024-Oct-19)
+    * Change the documented name of `finalSizeCallback` to `calculatedTotalSizeCallback` to hopefully avoid confusion. [issue #71](https://github.com/thejoshwolfe/yazl/issues/71)
 * 3.0.0 (2024-Oct-18)
     * Upgrade dependencies. This indirectly drops support for older versions of node.
 * 2.5.1 (2018-Nov-30)
