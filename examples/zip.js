@@ -87,6 +87,6 @@ args.forEach(function(arg) {
     }
   }
 });
-zipfile.end({forceZip64Format: options.forceZip64Format}, function(finalSize) {
-  console.log("finalSize prediction: " + finalSize);
+zipfile.end({forceZip64Format: options.forceZip64Format}, function(calculatedTotalSize) {
+  console.log("calculatedTotalSize prediction: " + calculatedTotalSize);
 });

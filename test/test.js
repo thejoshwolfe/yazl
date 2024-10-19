@@ -15,8 +15,8 @@ var BufferList = require("bl");
   var expectedContents = fs.readFileSync(__filename);
   zipfile.addBuffer(expectedContents, "with/directories.txt", fileMetadata);
   zipfile.addBuffer(expectedContents, "with\\windows-paths.txt", fileMetadata);
-  zipfile.end(function(finalSize) {
-    if (finalSize !== -1) throw new Error("finalSize is impossible to know before compression");
+  zipfile.end(function(calculatedTotalSize) {
+    if (calculatedTotalSize !== -1) throw new Error("calculatedTotalSize is impossible to know before compression");
     zipfile.outputStream.pipe(BufferList(function(err, data) {
       if (err) throw err;
       yauzl.fromBuffer(data, function(err, zipfile) {
@@ -62,11 +62,11 @@ var BufferList = require("bl");
     options.size = "stream".length;
     zipfile.addReadStream(new BufferList().append("stream"), "stream.txt", options);
     options.size = null;
-    zipfile.end({forceZip64Format:!!zip64Config[4]}, function(finalSize) {
-      if (finalSize === -1) throw new Error("finalSize should be known");
+    zipfile.end({forceZip64Format:!!zip64Config[4]}, function(calculatedTotalSize) {
+      if (calculatedTotalSize === -1) throw new Error("calculatedTotalSize should be known");
       zipfile.outputStream.pipe(new BufferList(function(err, data) {
-        if (data.length !== finalSize) throw new Error("finalSize prediction is wrong. " + finalSize + " !== " + data.length);
-        console.log("finalSize(" + zip64Config.join("") + "): pass");
+        if (data.length !== calculatedTotalSize) throw new Error("calculatedTotalSize prediction is wrong. " + calculatedTotalSize + " !== " + data.length);
+        console.log("calculatedTotalSize(" + zip64Config.join("") + "): pass");
       }));
     });
   });
@@ -80,8 +80,8 @@ var BufferList = require("bl");
   zipfile.addReadStream(new BufferList().append("stream"), "c.txt");
   zipfile.addEmptyDirectory("d/");
   zipfile.addEmptyDirectory("e");
-  zipfile.end(function(finalSize) {
-    if (finalSize !== -1) throw new Error("finalSize should be unknown");
+  zipfile.end(function(calculatedTotalSize) {
+    if (calculatedTotalSize !== -1) throw new Error("calculatedTotalSize should be unknown");
     zipfile.outputStream.pipe(new BufferList(function(err, data) {
       if (err) throw err;
       yauzl.fromBuffer(data, function(err, zipfile) {
@@ -105,11 +105,11 @@ var BufferList = require("bl");
   var zipfile = new yazl.ZipFile();
   // all options parameters are optional
   zipfile.addBuffer(bufferFrom("hello"), "hello.txt", {compress: false});
-  zipfile.end(function(finalSize) {
-    if (finalSize === -1) throw new Error("finalSize should be known");
+  zipfile.end(function(calculatedTotalSize) {
+    if (calculatedTotalSize === -1) throw new Error("calculatedTotalSize should be known");
     zipfile.outputStream.pipe(new BufferList(function(err, data) {
       if (err) throw err;
-      if (data.length !== finalSize) throw new Error("finalSize prediction is wrong. " + finalSize + " !== " + data.length);
+      if (data.length !== calculatedTotalSize) throw new Error("calculatedTotalSize prediction is wrong. " + calculatedTotalSize + " !== " + data.length);
       yauzl.fromBuffer(data, function(err, zipfile) {
         if (err) throw err;
         var entryNames = ["hello.txt"];
@@ -138,11 +138,11 @@ var weirdChars = '\u0000☺☻♥♦♣♠•◘○◙♂♀♪♫☼►◄↕�
     var zipfile = new yazl.ZipFile();
     zipfile.end({
       comment: testCase[0],
-    }, function(finalSize) {
-      if (finalSize === -1) throw new Error("finalSize should be known");
+    }, function(calculatedTotalSize) {
+      if (calculatedTotalSize === -1) throw new Error("calculatedTotalSize should be known");
       zipfile.outputStream.pipe(new BufferList(function(err, data) {
         if (err) throw err;
-        if (data.length !== finalSize) throw new Error("finalSize prediction is wrong. " + finalSize + " !== " + data.length);
+        if (data.length !== calculatedTotalSize) throw new Error("calculatedTotalSize prediction is wrong. " + calculatedTotalSize + " !== " + data.length);
         yauzl.fromBuffer(data, function(err, zipfile) {
           if (err) throw err;
           if (zipfile.comment !== testCase[1]) {
@@ -180,11 +180,11 @@ var weirdChars = '\u0000☺☻♥♦♣♠•◘○◙♂♀♪♫☼►◄↕�
     var zipfile = new yazl.ZipFile();
     // all options parameters are optional
     zipfile.addBuffer(bufferFrom("hello"), "hello.txt", {compress: false, fileComment: testCase[0]});
-    zipfile.end(function(finalSize) {
-      if (finalSize === -1) throw new Error("finalSize should be known");
+    zipfile.end(function(calculatedTotalSize) {
+      if (calculatedTotalSize === -1) throw new Error("calculatedTotalSize should be known");
       zipfile.outputStream.pipe(new BufferList(function(err, data) {
         if (err) throw err;
-        if (data.length !== finalSize) throw new Error("finalSize prediction is wrong. " + finalSize + " !== " + data.length);
+        if (data.length !== calculatedTotalSize) throw new Error("calculatedTotalSize prediction is wrong. " + calculatedTotalSize + " !== " + data.length);
         yauzl.fromBuffer(data, function(err, zipfile) {
           if (err) throw err;
           var entryNames = ["hello.txt"];

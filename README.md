@@ -182,7 +182,7 @@ If `metadataPath` does not end with a `"/"`, a `"/"` will be appended.
 
 See `addFile()` for the meaning of `mtime` and `mode`.
 
-#### end([options], [finalSizeCallback])
+#### end([options], [calculatedTotalSizeCallback])
 
 Indicates that no more files will be added via `addFile()`, `addReadStream()`, or `addBuffer()`,
 and causes the eventual close of `outputStream`.
@@ -212,28 +212,28 @@ This restriction is recommended for maxium compatibility.
 To use UTF-8 encoding at your own risk, pass a `Buffer` into this function; it will not be validated.
 
 
-If specified and non-null, `finalSizeCallback` is given the parameters `(finalSize)`
+If specified and non-null, `calculatedTotalSizeCallback` is given the parameters `(calculatedTotalSize)`
 sometime during or after the call to `end()`.
-`finalSize` is of type `Number` and can either be `-1`
+`calculatedTotalSize` is of type `Number` and can either be `-1`
 or the guaranteed eventual size in bytes of the output data that can be read from `outputStream`.
 
-Note that `finalSizeCallback` is usually called well before `outputStream` has piped all its data;
+Note that `calculatedTotalSizeCallback` is usually called well before `outputStream` has piped all its data;
 this callback does not mean that the stream is done.
 
-(The `finalSizeCallback` feature was added to this library to support the use case of a web server constructing a zip file dynamically
+(The `calculatedTotalSizeCallback` feature was added to this library to support the use case of a web server constructing a zip file dynamically
 and serving it without buffering the contents on disk or in ram.
-`finalSize` can become the `Content-Length` header before piping the `outputStream` as the response body.)
+`calculatedTotalSize` can become the `Content-Length` header before piping the `outputStream` as the response body.)
 
-If `finalSize` is `-1`, it means means the final size is too hard to guess before processing the input file data.
+If `calculatedTotalSize` is `-1`, it means means the total size is too hard to guess before processing the input file data.
 This will happen if and only if the `compress` option is `true` on any call to `addFile()`, `addReadStream()`, `addBuffer()`, or `addEmptyDirectory()`,
 or if `addReadStream()` is called and the optional `size` option is not given.
 In other words, clients should know whether they're going to get a `-1` or a real value
 by looking at how they are using this library.
 
-The call to `finalSizeCallback` might be delayed if yazl is still waiting for `fs.Stats` for an `addFile()` entry.
-If `addFile()` was never called, `finalSizeCallback` will be called during the call to `end()`.
-It is not required to start piping data from `outputStream` before `finalSizeCallback` is called.
-`finalSizeCallback` will be called only once, and only if this is the first call to `end()`.
+The call to `calculatedTotalSizeCallback` might be delayed if yazl is still waiting for `fs.Stats` for an `addFile()` entry.
+If `addFile()` was never called, `calculatedTotalSizeCallback` will be called during the call to `end()`.
+It is not required to start piping data from `outputStream` before `calculatedTotalSizeCallback` is called.
+`calculatedTotalSizeCallback` will be called only once, and only if this is the first call to `end()`.
 
 #### outputStream
 

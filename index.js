@@ -110,15 +110,15 @@ ZipFile.prototype.addEmptyDirectory = function(metadataPath, options) {
 
 var eocdrSignatureBuffer = bufferFrom([0x50, 0x4b, 0x05, 0x06]);
 
-ZipFile.prototype.end = function(options, finalSizeCallback) {
+ZipFile.prototype.end = function(options, calculatedTotalSizeCallback) {
   if (typeof options === "function") {
-    finalSizeCallback = options;
+    calculatedTotalSizeCallback = options;
     options = null;
   }
   if (options == null) options = {};
   if (this.ended) return;
   this.ended = true;
-  this.finalSizeCallback = finalSizeCallback;
+  this.calculatedTotalSizeCallback = calculatedTotalSizeCallback;
   this.forceZip64Eocd = !!options.forceZip64Format;
   if (options.comment) {
     if (typeof options.comment === "string") {
@@ -169,13 +169,13 @@ function pumpFileDataReadStream(self, entry, readStream) {
 
 function pumpEntries(self) {
   if (self.allDone) return;
-  // first check if finalSize is finally known
-  if (self.ended && self.finalSizeCallback != null) {
-    var finalSize = calculateFinalSize(self);
-    if (finalSize != null) {
+  // first check if calculatedTotalSize is finally known
+  if (self.ended && self.calculatedTotalSizeCallback != null) {
+    var calculatedTotalSize = calculateTotalSize(self);
+    if (calculatedTotalSize != null) {
       // we have an answer
-      self.finalSizeCallback(finalSize);
-      self.finalSizeCallback = null;
+      self.calculatedTotalSizeCallback(calculatedTotalSize);
+      self.calculatedTotalSizeCallback = null;
     }
   }
 
@@ -213,7 +213,7 @@ function pumpEntries(self) {
   }
 }
 
-function calculateFinalSize(self) {
+function calculateTotalSize(self) {
   var pretendOutputCursor = 0;
   var centralDirectorySize = 0;
   for (var i = 0; i < self.entries.length; i++) {
@@ -221,7 +221,7 @@ function calculateFinalSize(self) {
     // compression is too hard to predict
     if (entry.compress) return -1;
     if (entry.state >= Entry.READY_TO_PUMP_FILE_DATA) {
-      // if addReadStream was called without providing the size, we can't predict the final size
+      // if addReadStream was called without providing the size, we can't predict the total size
       if (entry.uncompressedSize == null) return -1;
     } else {
       // if we're still waiting for fs.stat, we might learn the size someday
