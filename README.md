@@ -95,7 +95,24 @@ the number of simultaneous open files is `O(1)`, probably just 1 at a time.
 #### addReadStream(readStream, metadataPath, [options])
 
 Adds a file to the zip file whose content is read from `readStream`.
-See `addFile()` for info about the `metadataPath` parameter.
+This method is effectively implemented as `this.addReadStreamLazy(metadataPath, options, cb => cb(null, readStream))`.
+
+In general, it is recommended to use `addReadStreamLazy` instead of this method
+to avoid holding a large number of system resources open for a long time.
+This method is provided for backward compatibility,
+and for convenience in cases where the `readStream` doesn't require meaningful resources to hold open and waiting.
+
+#### addReadStreamLazy(metadataPath[, options], getReadStreamFunction)
+
+Adds a file to the zip file whose content is read from a read stream obtained by calling `getReadStreamFunction(cb)`.
+`getReadStreamFunction(cb)` is called with a single callback function.
+Your implementation of `getReadStreamFunction` should eventually call `cb(err, readStream)`
+and give the `readStream` that provides the contents of the file to add to the zip file.
+If `err` is given (if it is truthy), it will be emitted from this `ZipFile` object.
+The return value from `cb` is unspecified.
+
+See `addFile()` for the meaning of the `metadataPath` parameter.
+`typeof getReadStreamFunction` must be `'function'`, which is used to determine when `options` has been omitted.
 `options` may be omitted or null and has the following structure and default values:
 
 ```js
@@ -115,6 +132,15 @@ and an error will be emitted if there is a mismatch.
 
 Note that yazl will `.pipe()` data from `readStream`, so be careful using `.on('data')`.
 In certain versions of node, `.on('data')` makes `.pipe()` behave incorrectly.
+
+Here's an example call to this method to illustrate the function callbacks:
+
+```js
+zipfile.addReadStreamLazy("path/in/archive.txt", function(cb) {
+  var readStream = getTheReadStreamSomehow();
+  cb(readStream);
+});
+```
 
 #### addBuffer(buffer, metadataPath, [options])
 
