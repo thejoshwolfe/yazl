@@ -228,6 +228,33 @@ var weirdChars = '\u0000☺☻♥♦♣♠•◘○◙♂♀♪♫☼►◄↕�
   });
 })();
 
+// Test:
+//  * giving an error to the addReadStreamLazy callback emits the error on the zipfile.
+//  * calling addReadStreamLazy with no options argument.
+//  * trying to add beyond end() throws an error.
+(function() {
+  var zipfile = new yazl.ZipFile();
+  zipfile.on("error", function(err) {
+    if (err.message !== "error 1") throw new Error("expected only error 1, got: " + err.message);
+  });
+  zipfile.addReadStreamLazy("hello.txt", function(cb) {
+    cb(new Error("error 1"));
+  });
+  zipfile.addReadStreamLazy("hello2.txt", function(cb) {
+    cb(new Error("error 2"));
+  });
+  zipfile.end(function() {
+    throw new Error("should not call calculatedTotalSizeCallback in error conditions")
+  });
+  var gotError = false;
+  try {
+    zipfile.addBuffer(bufferFrom("a"), "a");
+  } catch (err) {
+    gotError = true;
+  }
+  if (!gotError) throw new Error("expected error for adding after calling end()");
+})();
+
 function bufferFrom(something, encoding) {
   bufferFrom = modern;
   try {

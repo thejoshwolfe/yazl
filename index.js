@@ -4,6 +4,7 @@ var PassThrough = require("stream").PassThrough;
 var zlib = require("zlib");
 var util = require("util");
 var EventEmitter = require("events").EventEmitter;
+var errorMonitor = require("events").errorMonitor;
 var crc32 = require("buffer-crc32");
 
 exports.ZipFile = ZipFile;
@@ -17,6 +18,10 @@ function ZipFile() {
   this.ended = false; // .end() sets this
   this.allDone = false; // set when we've written the last bytes
   this.forceZip64Eocd = false; // configurable in .end()
+  this.errored = false;
+  this.on(errorMonitor, function() {
+    this.errored = true;
+  });
 }
 
 ZipFile.prototype.addFile = function(realPath, metadataPath, options) {
@@ -24,6 +29,7 @@ ZipFile.prototype.addFile = function(realPath, metadataPath, options) {
   metadataPath = validateMetadataPath(metadataPath, false);
   if (options == null) options = {};
 
+  if (shouldIgnoreAdding(self)) return;
   var entry = new Entry(metadataPath, false, options);
   self.entries.push(entry);
   fs.stat(realPath, function(err, stats) {
@@ -58,6 +64,8 @@ ZipFile.prototype.addReadStreamLazy = function(metadataPath, options, getReadStr
   }
   if (options == null) options = {};
   metadataPath = validateMetadataPath(metadataPath, false);
+
+  if (shouldIgnoreAdding(self)) return;
   var entry = new Entry(metadataPath, false, options);
   self.entries.push(entry);
   entry.setFileDataPumpFunction(function() {
@@ -76,6 +84,8 @@ ZipFile.prototype.addBuffer = function(buffer, metadataPath, options) {
   if (buffer.length > 0x3fffffff) throw new Error("buffer too large: " + buffer.length + " > " + 0x3fffffff);
   if (options == null) options = {};
   if (options.size != null) throw new Error("options.size not allowed");
+
+  if (shouldIgnoreAdding(self)) return;
   var entry = new Entry(metadataPath, false, options);
   entry.uncompressedSize = buffer.length;
   entry.crc32 = crc32.unsigned(buffer);
@@ -111,6 +121,8 @@ ZipFile.prototype.addEmptyDirectory = function(metadataPath, options) {
   if (options == null) options = {};
   if (options.size != null) throw new Error("options.size not allowed");
   if (options.compress != null) throw new Error("options.compress not allowed");
+
+  if (shouldIgnoreAdding(self)) return;
   var entry = new Entry(metadataPath, true, options);
   self.entries.push(entry);
   entry.setFileDataPumpFunction(function() {
@@ -131,6 +143,7 @@ ZipFile.prototype.end = function(options, calculatedTotalSizeCallback) {
   if (options == null) options = {};
   if (this.ended) return;
   this.ended = true;
+  if (this.errored) return;
   this.calculatedTotalSizeCallback = calculatedTotalSizeCallback;
   this.forceZip64Eocd = !!options.forceZip64Format;
   if (options.comment) {
@@ -181,7 +194,7 @@ function pumpFileDataReadStream(self, entry, readStream) {
 }
 
 function pumpEntries(self) {
-  if (self.allDone) return;
+  if (self.allDone || self.errored) return;
   // first check if calculatedTotalSize is finally known
   if (self.ended && self.calculatedTotalSizeCallback != null) {
     var calculatedTotalSize = calculateTotalSize(self);
@@ -271,6 +284,12 @@ function calculateTotalSize(self) {
   }
   endOfCentralDirectorySize += END_OF_CENTRAL_DIRECTORY_RECORD_SIZE + self.comment.length;
   return pretendOutputCursor + centralDirectorySize + endOfCentralDirectorySize;
+}
+
+function shouldIgnoreAdding(self) {
+  if (self.ended) throw new Error("cannot add entries after calling end()");
+  if (self.errored) return true;
+  return false;
 }
 
 var ZIP64_END_OF_CENTRAL_DIRECTORY_RECORD_SIZE = 56;

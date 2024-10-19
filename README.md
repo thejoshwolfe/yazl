@@ -210,7 +210,7 @@ See `addFile()` for the meaning of `mtime` and `mode`.
 
 #### end([options], [calculatedTotalSizeCallback])
 
-Indicates that no more files will be added via `addFile()`, `addReadStream()`, `addReadStreamLazy()`, or `addBuffer()`,
+Indicates that no more files will be added via `addFile()`, `addReadStream()`, `addReadStreamLazy()`, `addBuffer()`, or `addEmptyDirectory()`,
 and causes the eventual close of `outputStream`.
 
 `options` may be omitted or null and has the following structure and default values:
