@@ -1,7 +1,7 @@
 var fs = require("fs");
 var yazl = require("../");
 var yauzl = require("yauzl");
-var BufferList = require("bl");
+var BufferList = require("./bl-minimal.js");
 
 (function() {
   var fileMetadata = {
@@ -17,14 +17,14 @@ var BufferList = require("bl");
   zipfile.addBuffer(expectedContents, "with\\windows-paths.txt", fileMetadata);
   zipfile.end(function(calculatedTotalSize) {
     if (calculatedTotalSize !== -1) throw new Error("calculatedTotalSize is impossible to know before compression");
-    zipfile.outputStream.pipe(BufferList(function(err, data) {
+    zipfile.outputStream.pipe(new BufferList(function(err, data) {
       if (err) throw err;
       yauzl.fromBuffer(data, function(err, zipfile) {
         if (err) throw err;
         zipfile.on("entry", function(entry) {
           zipfile.openReadStream(entry, function(err, readStream) {
             if (err) throw err;
-            readStream.pipe(BufferList(function(err, data) {
+            readStream.pipe(new BufferList(function(err, data) {
               if (err) throw err;
               if (expectedContents.toString("binary") !== data.toString("binary")) throw new Error("unexpected contents");
               console.log(entry.fileName + ": pass");
@@ -60,7 +60,7 @@ var BufferList = require("bl");
     zipfile.addBuffer(bufferFrom("buffer"), "buffer.txt", options);
     options.forceZip64Format = !!zip64Config[3];
     options.size = "stream".length;
-    zipfile.addReadStream(new BufferList().append("stream"), "stream.txt", options);
+    zipfile.addReadStream(new BufferList().append(Buffer.from("stream")), "stream.txt", options);
     options.size = null;
     zipfile.end({forceZip64Format:!!zip64Config[4]}, function(calculatedTotalSize) {
       if (calculatedTotalSize === -1) throw new Error("calculatedTotalSize should be known");
@@ -77,7 +77,7 @@ var BufferList = require("bl");
   // all options parameters are optional
   zipfile.addFile(__filename, "a.txt");
   zipfile.addBuffer(bufferFrom("buffer"), "b.txt");
-  zipfile.addReadStream(new BufferList().append("stream"), "c.txt");
+  zipfile.addReadStream(new BufferList().append(Buffer.from("stream")), "c.txt");
   zipfile.addEmptyDirectory("d/");
   zipfile.addEmptyDirectory("e");
   zipfile.end(function(calculatedTotalSize) {
