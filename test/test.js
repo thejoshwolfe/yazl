@@ -3,10 +3,16 @@ var yazl = require("../");
 var yauzl = require("yauzl");
 var BufferList = require("./bl-minimal.js");
 
+// Test:
+//  * filename canonicalization.
+//  * addFile, addReadStream, and addBuffer
+//  * extracting the zip file (via yauzl) gives the correct contents.
+//  * compress: false
+//  * specifying mode and mtime options, but not checking them.
 (function() {
   var fileMetadata = {
     mtime: new Date(),
-    mode: 0100664,
+    mode: 0o100664,
   };
   var zipfile = new yazl.ZipFile();
   zipfile.addFile(__filename, "unicōde.txt");
@@ -26,7 +32,7 @@ var BufferList = require("./bl-minimal.js");
             if (err) throw err;
             readStream.pipe(new BufferList(function(err, data) {
               if (err) throw err;
-              if (expectedContents.toString("binary") !== data.toString("binary")) throw new Error("unexpected contents");
+              if (!expectedContents.equals(data)) throw new Error("unexpected contents");
               console.log(entry.fileName + ": pass");
             }));
           });
@@ -36,6 +42,11 @@ var BufferList = require("./bl-minimal.js");
   });
 })();
 
+// Test:
+//  * forceZip64Format for various subsets of entries.
+//  * specifying size for addReadStream.
+//  * calculatedTotalSize should always be known.
+//  * calculatedTotalSize is correct.
 (function() {
   var zip64Combinations = [
     [0, 0, 0, 0, 0],
@@ -59,9 +70,12 @@ var BufferList = require("./bl-minimal.js");
     options.forceZip64Format = !!zip64Config[2];
     zipfile.addBuffer(bufferFrom("buffer"), "buffer.txt", options);
     options.forceZip64Format = !!zip64Config[3];
-    options.size = "stream".length;
-    zipfile.addReadStream(new BufferList().append(Buffer.from("stream")), "stream.txt", options);
+
+    var someBuffer = bufferFrom("stream");
+    options.size = someBuffer.length;
+    zipfile.addReadStream(new BufferList().append(someBuffer), "stream.txt", options);
     options.size = null;
+
     zipfile.end({forceZip64Format:!!zip64Config[4]}, function(calculatedTotalSize) {
       if (calculatedTotalSize === -1) throw new Error("calculatedTotalSize should be known");
       zipfile.outputStream.pipe(new BufferList(function(err, data) {
@@ -72,12 +86,12 @@ var BufferList = require("./bl-minimal.js");
   });
 })();
 
+// Test adding empty directories and verifying their names in the resulting zipfile.
 (function() {
   var zipfile = new yazl.ZipFile();
-  // all options parameters are optional
   zipfile.addFile(__filename, "a.txt");
   zipfile.addBuffer(bufferFrom("buffer"), "b.txt");
-  zipfile.addReadStream(new BufferList().append(Buffer.from("stream")), "c.txt");
+  zipfile.addReadStream(new BufferList().append(bufferFrom("stream")), "c.txt");
   zipfile.addEmptyDirectory("d/");
   zipfile.addEmptyDirectory("e");
   zipfile.end(function(calculatedTotalSize) {
@@ -101,9 +115,11 @@ var BufferList = require("./bl-minimal.js");
   });
 })();
 
+// Test:
+//  * just calling addBuffer() and no other add functions.
+//  * calculatedTotalSize should be known and correct for addBuffer with compress:false.
 (function() {
   var zipfile = new yazl.ZipFile();
-  // all options parameters are optional
   zipfile.addBuffer(bufferFrom("hello"), "hello.txt", {compress: false});
   zipfile.end(function(calculatedTotalSize) {
     if (calculatedTotalSize === -1) throw new Error("calculatedTotalSize should be known");
@@ -127,6 +143,10 @@ var BufferList = require("./bl-minimal.js");
   });
 })();
 
+// Test:
+//  * zipfile with no entries.
+//  * comment can be string or Buffer.
+//  * archive comment uses CP437 encoding for non-ASCII strings. (or rather that yazl and yauzl agree on the encoding.)
 var weirdChars = '\u0000☺☻♥♦♣♠•◘○◙♂♀♪♫☼►◄↕‼¶§▬↨↑↓→←∟↔▲▼⌂ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥₧ƒáíóúñÑªº¿⌐¬½¼¡«»░▒▓│┤╡╢╖╕╣║╗╝╜╛┐└┴┬├─┼╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪┘┌█▄▌▐▀αßΓπΣσµτΦΘΩδ∞φε∩≡±≥≤⌠⌡÷≈°∙·√ⁿ²■ ';
 (function() {
   var testCases = [
@@ -155,6 +175,7 @@ var weirdChars = '\u0000☺☻♥♦♣♠•◘○◙♂♀♪♫☼►◄↕�
   });
 })();
 
+// Test ensuring that archive comment cannot create an ambiguous zip file.
 (function() {
   var zipfile = new yazl.ZipFile();
   try {
@@ -170,6 +191,11 @@ var weirdChars = '\u0000☺☻♥♦♣♠•◘○◙♂♀♪♫☼►◄↕�
   throw new Error("expected error for including eocdr signature in comment");
 })();
 
+// Test:
+//  * specifying fileComment via addBuffer.
+//  * fileComment can be string or Buffer.
+//  * yauzl and yazl agree on the encoding.
+//  * calculatedTotalSize is known and correct with compress:false.
 (function() {
   var testCases = [
     ["Hello World!", "Hello World!"],
@@ -178,7 +204,6 @@ var weirdChars = '\u0000☺☻♥♦♣♠•◘○◙♂♀♪♫☼►◄↕�
   ];
   testCases.forEach(function(testCase, i) {
     var zipfile = new yazl.ZipFile();
-    // all options parameters are optional
     zipfile.addBuffer(bufferFrom("hello"), "hello.txt", {compress: false, fileComment: testCase[0]});
     zipfile.end(function(calculatedTotalSize) {
       if (calculatedTotalSize === -1) throw new Error("calculatedTotalSize should be known");
