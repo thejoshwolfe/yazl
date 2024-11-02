@@ -198,7 +198,9 @@ function determineCompressionLevel(options) {
   if (options.compress != null && options.compressionLevel != null) {
     if (!!options.compress !== !!options.compressionLevel) throw new Error("conflicting settings for compress and compressionLevel");
   }
-  return options.compressionLevel || (options.compress ? 6 : 0);
+  if (options.compressionLevel != null) return options.compressionLevel;
+  if (options.compress === false) return 0;
+  return 6;
 }
 
 function pumpEntries(self) {

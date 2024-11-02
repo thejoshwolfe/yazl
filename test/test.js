@@ -9,6 +9,7 @@ var BufferList = require("./bl-minimal.js");
 //  * extracting the zip file (via yauzl) gives the correct contents.
 //  * compress: false
 //  * specifying mode and mtime options, but not checking them.
+//  * verifying compression method defaults to true.
 (function() {
   var fileMetadata = {
     mtime: new Date(),
@@ -28,6 +29,8 @@ var BufferList = require("./bl-minimal.js");
       yauzl.fromBuffer(data, function(err, zipfile) {
         if (err) throw err;
         zipfile.on("entry", function(entry) {
+          var expectedCompressionMethod = entry.fileName === "without-compression.txt" ? 0 : 8;
+          if (entry.compressionMethod !== expectedCompressionMethod) throw new Error("expected " + entry.fileName + " compression method " + expectedCompressionMethod + ". found: " + entry.compressionMethod);
           zipfile.openReadStream(entry, function(err, readStream) {
             if (err) throw err;
             readStream.pipe(new BufferList(function(err, data) {
@@ -160,6 +163,7 @@ var BufferList = require("./bl-minimal.js");
 // Test:
 //  * just calling addBuffer() and no other add functions.
 //  * calculatedTotalSize should be known and correct for addBuffer with compress:false.
+//  * addBuffer with compress:false disables compression.
 (function() {
   var zipfile = new yazl.ZipFile();
   zipfile.addBuffer(bufferFrom("hello"), "hello.txt", {compress: false});
@@ -176,6 +180,8 @@ var BufferList = require("./bl-minimal.js");
           if (entry.fileName !== expectedName) {
             throw new Error("unexpected entry fileName: " + entry.fileName + ", expected: " + expectedName);
           }
+          var expectedCompressionMethod = 0;
+          if (entry.compressionMethod !== expectedCompressionMethod) throw new Error("expected " + entry.fileName + " compression method " + expectedCompressionMethod + ". found: " + entry.compressionMethod);
         });
         zipfile.on("end", function() {
           if (entryNames.length === 0) console.log("justAddBuffer: pass");
