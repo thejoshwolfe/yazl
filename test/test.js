@@ -9,6 +9,7 @@ var BufferList = require("./bl-minimal.js");
 //  * extracting the zip file (via yauzl) gives the correct contents.
 //  * compress: false
 //  * specifying mode and mtime options, but not checking them.
+//  * verifying compression method defaults to true.
 (function() {
   var fileMetadata = {
     mtime: new Date(),
@@ -28,6 +29,8 @@ var BufferList = require("./bl-minimal.js");
       yauzl.fromBuffer(data, function(err, zipfile) {
         if (err) throw err;
         zipfile.on("entry", function(entry) {
+          var expectedCompressionMethod = entry.fileName === "without-compression.txt" ? 0 : 8;
+          if (entry.compressionMethod !== expectedCompressionMethod) throw new Error("expected " + entry.fileName + " compression method " + expectedCompressionMethod + ". found: " + entry.compressionMethod);
           zipfile.openReadStream(entry, function(err, readStream) {
             if (err) throw err;
             readStream.pipe(new BufferList(function(err, data) {
@@ -36,6 +39,48 @@ var BufferList = require("./bl-minimal.js");
               console.log(entry.fileName + ": pass");
             }));
           });
+        });
+      });
+    }));
+  });
+})();
+
+// Test:
+//  * specifying compressionLevel varies the output size.
+//  * specifying compressionLevel:0 disables compression.
+(function() {
+  var options = {
+    mtime: new Date(),
+    mode: 0o100664,
+  };
+  var zipfile = new yazl.ZipFile();
+  options.compressionLevel = 1;
+  zipfile.addFile(__filename, "level1.txt", options);
+  options.compressionLevel = 9;
+  zipfile.addFile(__filename, "level9.txt", options);
+  options.compressionLevel = 0;
+  zipfile.addFile(__filename, "level0.txt", options);
+  zipfile.end(function(calculatedTotalSize) {
+    if (calculatedTotalSize !== -1) throw new Error("calculatedTotalSize is impossible to know before compression");
+    zipfile.outputStream.pipe(new BufferList(function(err, data) {
+      if (err) throw err;
+      yauzl.fromBuffer(data, function(err, zipfile) {
+        if (err) throw err;
+
+        var fileNameToSize = {};
+        zipfile.on("entry", function(entry) {
+          fileNameToSize[entry.fileName] = entry.compressedSize;
+          var expectedCompressionMethod = entry.fileName === "level0.txt" ? 0 : 8;
+          if (entry.compressionMethod !== expectedCompressionMethod) throw new Error("expected " + entry.fileName + " compression method " + expectedCompressionMethod + ". found: " + entry.compressionMethod);
+        });
+        zipfile.on("end", function() {
+          var size0 = fileNameToSize["level0.txt"];
+          var size1 = fileNameToSize["level1.txt"];
+          var size9 = fileNameToSize["level9.txt"];
+          // Note: undefined coerces to NaN which always results in the comparison evaluating to `false`.
+          if (!(size0 >= size1)) throw new Error("Compression level 1 inflated size. expected: " + size0 + " >= " + size1);
+          if (!(size1 >= size9)) throw new Error("Compression level 9 inflated size. expected: " + size1 + " >= " + size9);
+          console.log("compressionLevel (" + size0 + " >= " + size1 + " >= " + size9 + "): pass");
         });
       });
     }));
@@ -118,6 +163,7 @@ var BufferList = require("./bl-minimal.js");
 // Test:
 //  * just calling addBuffer() and no other add functions.
 //  * calculatedTotalSize should be known and correct for addBuffer with compress:false.
+//  * addBuffer with compress:false disables compression.
 (function() {
   var zipfile = new yazl.ZipFile();
   zipfile.addBuffer(bufferFrom("hello"), "hello.txt", {compress: false});
@@ -134,6 +180,8 @@ var BufferList = require("./bl-minimal.js");
           if (entry.fileName !== expectedName) {
             throw new Error("unexpected entry fileName: " + entry.fileName + ", expected: " + expectedName);
           }
+          var expectedCompressionMethod = 0;
+          if (entry.compressionMethod !== expectedCompressionMethod) throw new Error("expected " + entry.fileName + " compression method " + expectedCompressionMethod + ". found: " + entry.compressionMethod);
         });
         zipfile.on("end", function() {
           if (entryNames.length === 0) console.log("justAddBuffer: pass");

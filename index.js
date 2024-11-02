@@ -91,10 +91,10 @@ ZipFile.prototype.addBuffer = function(buffer, metadataPath, options) {
   entry.crc32 = crc32.unsigned(buffer);
   entry.crcAndFileSizeKnown = true;
   self.entries.push(entry);
-  if (!entry.compress) {
+  if (entry.compressionLevel === 0) {
     setCompressedBuffer(buffer);
   } else {
-    zlib.deflateRaw(buffer, function(err, compressedBuffer) {
+    zlib.deflateRaw(buffer, {level:1}, function(err, compressedBuffer) {
       setCompressedBuffer(compressedBuffer);
     });
   }
@@ -121,6 +121,7 @@ ZipFile.prototype.addEmptyDirectory = function(metadataPath, options) {
   if (options == null) options = {};
   if (options.size != null) throw new Error("options.size not allowed");
   if (options.compress != null) throw new Error("options.compress not allowed");
+  if (options.compressionLevel != null) throw new Error("options.compressionLevel not allowed");
 
   if (shouldIgnoreAdding(self)) return;
   var entry = new Entry(metadataPath, true, options);
@@ -171,7 +172,7 @@ function writeToOutputStream(self, buffer) {
 function pumpFileDataReadStream(self, entry, readStream) {
   var crc32Watcher = new Crc32Watcher();
   var uncompressedSizeCounter = new ByteCounter();
-  var compressor = entry.compress ? new zlib.DeflateRaw() : new PassThrough();
+  var compressor = entry.compressionLevel !== 0 ? new zlib.DeflateRaw({level:entry.compressionLevel}) : new PassThrough();
   var compressedSizeCounter = new ByteCounter();
   readStream.pipe(crc32Watcher)
             .pipe(uncompressedSizeCounter)
@@ -191,6 +192,15 @@ function pumpFileDataReadStream(self, entry, readStream) {
     entry.state = Entry.FILE_DATA_DONE;
     pumpEntries(self);
   });
+}
+
+function determineCompressionLevel(options) {
+  if (options.compress != null && options.compressionLevel != null) {
+    if (!!options.compress !== !!options.compressionLevel) throw new Error("conflicting settings for compress and compressionLevel");
+  }
+  if (options.compressionLevel != null) return options.compressionLevel;
+  if (options.compress === false) return 0;
+  return 6;
 }
 
 function pumpEntries(self) {
@@ -245,7 +255,7 @@ function calculateTotalSize(self) {
   for (var i = 0; i < self.entries.length; i++) {
     var entry = self.entries[i];
     // compression is too hard to predict
-    if (entry.compress) return -1;
+    if (entry.compressionLevel !== 0) return -1;
     if (entry.state >= Entry.READY_TO_PUMP_FILE_DATA) {
       // if addReadStream was called without providing the size, we can't predict the total size
       if (entry.uncompressedSize == null) return -1;
@@ -436,10 +446,9 @@ function Entry(metadataPath, isDirectory, options) {
     if (options.size != null) this.uncompressedSize = options.size;
   }
   if (isDirectory) {
-    this.compress = false;
+    this.compressionLevel = 0;
   } else {
-    this.compress = true; // default
-    if (options.compress != null) this.compress = !!options.compress;
+    this.compressionLevel = determineCompressionLevel(options);
   }
   this.forceZip64Format = !!options.forceZip64Format;
   if (options.fileComment) {
@@ -650,7 +659,7 @@ Entry.prototype.getCentralDirectoryRecord = function() {
 Entry.prototype.getCompressionMethod = function() {
   var NO_COMPRESSION = 0;
   var DEFLATE_COMPRESSION = 8;
-  return this.compress ? DEFLATE_COMPRESSION : NO_COMPRESSION;
+  return this.compressionLevel === 0 ? NO_COMPRESSION : DEFLATE_COMPRESSION;
 };
 
 function dateToDosDateTime(jsDate) {
