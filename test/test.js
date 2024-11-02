@@ -43,6 +43,48 @@ var BufferList = require("./bl-minimal.js");
 })();
 
 // Test:
+//  * specifying compressionLevel varies the output size.
+//  * specifying compressionLevel:0 disables compression.
+(function() {
+  var options = {
+    mtime: new Date(),
+    mode: 0o100664,
+  };
+  var zipfile = new yazl.ZipFile();
+  options.compressionLevel = 1;
+  zipfile.addFile(__filename, "level1.txt", options);
+  options.compressionLevel = 9;
+  zipfile.addFile(__filename, "level9.txt", options);
+  options.compressionLevel = 0;
+  zipfile.addFile(__filename, "level0.txt", options);
+  zipfile.end(function(calculatedTotalSize) {
+    if (calculatedTotalSize !== -1) throw new Error("calculatedTotalSize is impossible to know before compression");
+    zipfile.outputStream.pipe(new BufferList(function(err, data) {
+      if (err) throw err;
+      yauzl.fromBuffer(data, function(err, zipfile) {
+        if (err) throw err;
+
+        var fileNameToSize = {};
+        zipfile.on("entry", function(entry) {
+          fileNameToSize[entry.fileName] = entry.compressedSize;
+          var expectedCompressionMethod = entry.fileName === "level0.txt" ? 0 : 8;
+          if (entry.compressionMethod !== expectedCompressionMethod) throw new Error("expected " + entry.fileName + " compression method " + expectedCompressionMethod + ". found: " + entry.compressionMethod);
+        });
+        zipfile.on("end", function() {
+          var size0 = fileNameToSize["level0.txt"];
+          var size1 = fileNameToSize["level1.txt"];
+          var size9 = fileNameToSize["level9.txt"];
+          // Note: undefined coerces to NaN which always results in the comparison evaluating to `false`.
+          if (!(size0 >= size1)) throw new Error("Compression level 1 inflated size. expected: " + size0 + " >= " + size1);
+          if (!(size1 >= size9)) throw new Error("Compression level 9 inflated size. expected: " + size1 + " >= " + size9);
+          console.log("compressionLevel (" + size0 + " >= " + size1 + " >= " + size9 + "): pass");
+        });
+      });
+    }));
+  });
+})();
+
+// Test:
 //  * forceZip64Format for various subsets of entries.
 //  * specifying size for addReadStream.
 //  * calculatedTotalSize should always be known.

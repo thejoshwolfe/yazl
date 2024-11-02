@@ -63,6 +63,7 @@ After UTF-8 encoding, `metadataPath` must be at most `0xffff` bytes in length.
   mtime: stats.mtime,
   mode: stats.mode,
   compress: true,
+  compressionLevel: 6,
   forceZip64Format: false,
   fileComment: "", // or a UTF-8 Buffer
 }
@@ -77,6 +78,9 @@ yazl does not store group and user ids in the zip file.
 
 If `compress` is `true`, the file data will be deflated (compression method 8).
 If `compress` is `false`, the file data will be stored (compression method 0).
+If `compressionLevel` is specified, it will be passed to [`zlib`](https://nodejs.org/api/zlib.html#class-options).
+Specifying `compressionLevel: 0` is equivalent to `compress: false`.
+If both `compress` and `compressionLevel` are given, asserts that they do not conflict, i.e. `!!compress === !!compressionLevel`.
 
 If `forceZip64Format` is `true`, yazl will use ZIP64 format in this entry's Data Descriptor
 and Central Directory Record even if not needed (this may be useful for testing.).
@@ -120,13 +124,14 @@ See `addFile()` for the meaning of the `metadataPath` parameter.
   mtime: new Date(),
   mode: 0o100664,
   compress: true,
+  compressionLevel: 6,
   forceZip64Format: false,
   fileComment: "", // or a UTF-8 Buffer
   size: 12345, // example value
 }
 ```
 
-See `addFile()` for the meaning of `mtime`, `mode`, `compress`, `forceZip64Format`, and `fileComment`.
+See `addFile()` for the meaning of `mtime`, `mode`, `compress`, `compressionLevel`, `forceZip64Format`, and `fileComment`.
 If `size` is given, it will be checked against the actual number of bytes in the `readStream`,
 and an error will be emitted if there is a mismatch.
 
@@ -154,12 +159,13 @@ See `addFile()` for info about the `metadataPath` parameter.
   mtime: new Date(),
   mode: 0o100664,
   compress: true,
+  compressionLevel: 6,
   forceZip64Format: false,
   fileComment: "", // or a UTF-8 Buffer
 }
 ```
 
-See `addFile()` for the meaning of `mtime`, `mode`, `compress`, `forceZip64Format`, and `fileComment`.
+See `addFile()` for the meaning of `mtime`, `mode`, `compress`, `compressionLevel`, `forceZip64Format`, and `fileComment`.
 
 This method has the unique property that General Purpose Bit `3` will not be used in the Local File Header.
 This doesn't matter for unzip implementations that conform to the Zip File Spec.
@@ -251,10 +257,8 @@ and serving it without buffering the contents on disk or in ram.
 `calculatedTotalSize` can become the `Content-Length` header before piping the `outputStream` as the response body.)
 
 If `calculatedTotalSize` is `-1`, it means means the total size is too hard to guess before processing the input file data.
-This will happen if and only if the `compress` option is `true` on any call to `addFile()`, `addReadStream()`, `addReadStreamLazy()`, `addBuffer()`, or `addEmptyDirectory()`,
-or if `addReadStream()` or `addReadStreamLazy()` is called and the optional `size` option is not given.
-In other words, clients should know whether they're going to get a `-1` or a real value
-by looking at how they are using this library.
+To ensure the final size is known, disable compression (set `compress: false` or `compressionLevel: 0`)
+in every call to `addFile()`, `addReadStream()`, `addReadStreamLazy()`, and `addBuffer()`.
 
 The call to `calculatedTotalSizeCallback` might be delayed if yazl is still waiting for `fs.Stats` for an `addFile()` entry.
 If `addFile()` was never called, `calculatedTotalSizeCallback` will be called during the call to `end()`.
