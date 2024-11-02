@@ -134,6 +134,7 @@ See `addFile()` for the meaning of the `metadataPath` parameter.
 See `addFile()` for the meaning of `mtime`, `mode`, `compress`, `compressionLevel`, `forceZip64Format`, and `fileComment`.
 If `size` is given, it will be checked against the actual number of bytes in the `readStream`,
 and an error will be emitted if there is a mismatch.
+See the documentation on `calculatedTotalSizeCallback` for why the `size` option exists.
 
 Note that yazl will `.pipe()` data from `readStream`, so be careful using `.on('data')`.
 In certain versions of node, `.on('data')` makes `.pipe()` behave incorrectly.
@@ -243,7 +244,6 @@ then UTF-8 and CP437 (and ASCII) encodings are all identical.
 This restriction is recommended for maxium compatibility.
 To use UTF-8 encoding at your own risk, pass a `Buffer` into this function; it will not be validated.
 
-
 If specified and non-null, `calculatedTotalSizeCallback` is given the parameters `(calculatedTotalSize)`
 sometime during or after the call to `end()`.
 `calculatedTotalSize` is of type `Number` and can either be `-1`
@@ -258,7 +258,8 @@ and serving it without buffering the contents on disk or in ram.
 
 If `calculatedTotalSize` is `-1`, it means means the total size is too hard to guess before processing the input file data.
 To ensure the final size is known, disable compression (set `compress: false` or `compressionLevel: 0`)
-in every call to `addFile()`, `addReadStream()`, `addReadStreamLazy()`, and `addBuffer()`.
+in every call to `addFile()`, `addReadStream()`, `addReadStreamLazy()`, and `addBuffer()`,
+and additionally specify the optional `size` option in every call to `addReadStream()` and `addReadStreamLazy()`.
 
 The call to `calculatedTotalSizeCallback` might be delayed if yazl is still waiting for `fs.Stats` for an `addFile()` entry.
 If `addFile()` was never called, `calculatedTotalSizeCallback` will be called during the call to `end()`.
