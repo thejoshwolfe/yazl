@@ -94,7 +94,7 @@ ZipFile.prototype.addBuffer = function(buffer, metadataPath, options) {
   if (entry.compressionLevel === 0) {
     setCompressedBuffer(buffer);
   } else {
-    zlib.deflateRaw(buffer, {level:1}, function(err, compressedBuffer) {
+    zlib.deflateRaw(buffer, {level:entry.compressionLevel}, function(err, compressedBuffer) {
       setCompressedBuffer(compressedBuffer);
     });
   }
