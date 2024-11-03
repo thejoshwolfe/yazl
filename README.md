@@ -384,6 +384,8 @@ Instead, each of the fields is limited to 65,535 bytes due to the length of each
 
 ## Change History
 
+* 3.2.1 (2024-Nov-03)
+    * Fix typo in `addBuffer()` where `compressionLevel` wasn't being passed to zlib.
 * 3.2.0 (2024-Nov-02)
     * Add `compressionLevel` option to `addFile()`, `addBuffer()`, `addReadStream()`, `addReadStreamLazy()`. [issue #84](https://github.com/thejoshwolfe/yazl/issues/84)
     * Change wording around `calculatedTotalSizeCallback` again, and fix the documentation incorrectly claiming that `addEmptyDirectory()` was relevant in that context.
