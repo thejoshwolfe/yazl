@@ -87,9 +87,9 @@ If `forceZip64Format` is `true`, yazl will use ZIP64 format in this entry's Data
 and Central Directory Record even if not needed (this may be useful for testing.).
 Otherwise, yazl will use ZIP64 format where necessary.
 
-By default, yazl includes the Info-ZIP "universal timestamp" extended field (`0x5455` aka `"UT"`) to encode the `mtime`.
+Since yazl version 3.3.0, yazl includes the Info-ZIP "universal timestamp" extended field (`0x5455` aka `"UT"`) to encode the `mtime`.
 The Info-ZIP timestamp is a more modern encoding for the mtime and is generally recommended.
-Set `forceDosTimestamp` to `true` to revert to the pre-3.3.0 yazl behvior, disabling this extended field.
+Set `forceDosTimestamp` to `true` to revert to the pre-3.3.0 behvior, disabling this extended field.
 The DOS encoding is always included regardless of this option, because it is required in the fixed-size metadata of every archive entry.
 The benefits of the Info-ZIP encoding include: timezone is specified as always UTC, which is better for cloud environments and any teams working in multiple timezones; capable of encoding "time 0", the unix epoch in 1970, which is better for some package managers; the precision is 1-second accurate rather than rounded to the nearest even second. The disadvantages of including this field are: it requires an extra 9 bytes of metadata per entry added to the archive.
 
