@@ -93,6 +93,8 @@ Set `forceDosTimestamp` to `true` to revert to the pre-3.3.0 behvior, disabling 
 The DOS encoding is always included regardless of this option, because it is required in the fixed-size metadata of every archive entry.
 The benefits of the Info-ZIP encoding include: timezone is specified as always UTC, which is better for cloud environments and any teams working in multiple timezones; capable of encoding "time 0", the unix epoch in 1970, which is better for some package managers; the precision is 1-second accurate rather than rounded to the nearest even second. The disadvantages of including this field are: it requires an extra 9 bytes of metadata per entry added to the archive.
 
+When attempting to encode an `mtime` outside the supported range for either format, such as the year 1970 in the DOS format or the year 2039 for the modern format, the time will clamped to the closest supported time.
+
 If `fileComment` is a `string`, it will be encoded with UTF-8.
 If `fileComment` is a `Buffer`, it should be a UTF-8 encoded string.
 In UTF-8, `fileComment` must be at most `0xffff` bytes in length.

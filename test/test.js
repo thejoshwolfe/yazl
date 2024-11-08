@@ -88,8 +88,9 @@ var BufferList = require("./bl-minimal.js");
 })();
 
 // Test:
-//  * specifying mtime outside the bounds of dos formta
-//  * forceDosTimestamp
+//  * specifying mtime outside the bounds of dos format but in bounds for unix format.
+//  * forceDosTimestamp, and verifying the lower clamping for dos format.
+//  * specifying mtime after 2038, and verifying the clamping for unix format.
 (function() {
   var options = {
     mtime: new Date(0), // unix epoch
@@ -97,9 +98,12 @@ var BufferList = require("./bl-minimal.js");
     compress: false,
   };
   var zipfile = new yazl.ZipFile();
-  zipfile.addFile(__filename, "modern.txt", options);
+  zipfile.addFile(__filename, "modern-1970.txt", options);
   options.forceDosTimestamp = true;
-  zipfile.addFile(__filename, "dos.txt", options);
+  zipfile.addFile(__filename, "dos-1970.txt", options);
+  options.forceDosTimestamp = false;
+  options.mtime = new Date(2080, 1, 1); // year 2080 is beyond the unix range.
+  zipfile.addFile(__filename, "2080.txt", options);
   zipfile.end(function(calculatedTotalSize) {
     if (calculatedTotalSize === -1) throw new Error("calculatedTotalSize should be known");
     zipfile.outputStream.pipe(new BufferList(function(err, data) {
@@ -109,12 +113,15 @@ var BufferList = require("./bl-minimal.js");
         if (err) throw err;
         zipfile.on("entry", function(entry) {
           switch (entry.fileName) {
-            case "modern.txt":
+            case "modern-1970.txt":
               if (entry.getLastModDate().getTime() !== 0) throw new Error("expected unix epoch to be encodable. found: " + entry.getLastModDate());
               break;
-            case "dos.txt":
+            case "dos-1970.txt":
               var year = entry.getLastModDate().getFullYear();
               if (!(1979 <= year && year <= 1981)) throw new Error("expected dos format year to be clamped to 1980ish. found: " + entry.getLastModDate());
+              break;
+            case "2080.txt":
+              if (entry.getLastModDate().getUTCFullYear() !== 2038) throw new Error("expected timestamp clamped down to year 2038. found: " + entry.getLastModDate());
               break;
             default: throw new Error(entry.fileName);
           }

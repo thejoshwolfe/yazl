@@ -605,7 +605,10 @@ Entry.prototype.getCentralDirectoryRecord = function() {
     // Flags         Byte        info bits
     izutefBuffer.writeUInt8(EB_UT_FL_MTIME | EB_UT_FL_ATIME, 4);
     // (ModTime)     Long        time of last modification (UTC/GMT)
-    izutefBuffer.writeUInt32LE(Math.floor(this.mtime.getTime() / 1000), 5);
+    var timestamp = Math.floor(this.mtime.getTime() / 1000);
+    if (timestamp < -0x80000000) timestamp = -0x80000000; // 1901-12-13T20:45:52.000Z
+    if (timestamp >  0x7fffffff) timestamp =  0x7fffffff; // 2038-01-19T03:14:07.000Z
+    izutefBuffer.writeUInt32LE(timestamp, 5);
   }
 
   var normalCompressedSize = this.compressedSize;
