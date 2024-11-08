@@ -88,6 +88,46 @@ var BufferList = require("./bl-minimal.js");
 })();
 
 // Test:
+//  * specifying mtime outside the bounds of dos formta
+//  * forceDosTimestamp
+(function() {
+  var options = {
+    mtime: new Date(0), // unix epoch
+    mode: 0o100664,
+    compress: false,
+  };
+  var zipfile = new yazl.ZipFile();
+  zipfile.addFile(__filename, "modern.txt", options);
+  options.forceDosTimestamp = true;
+  zipfile.addFile(__filename, "dos.txt", options);
+  zipfile.end(function(calculatedTotalSize) {
+    if (calculatedTotalSize === -1) throw new Error("calculatedTotalSize should be known");
+    zipfile.outputStream.pipe(new BufferList(function(err, data) {
+      if (err) throw err;
+      if (data.length !== calculatedTotalSize) throw new Error("calculatedTotalSize prediction is wrong. " + calculatedTotalSize + " !== " + data.length);
+      yauzl.fromBuffer(data, function(err, zipfile) {
+        if (err) throw err;
+        zipfile.on("entry", function(entry) {
+          switch (entry.fileName) {
+            case "modern.txt":
+              if (entry.getLastModDate().getTime() !== 0) throw new Error("expected unix epoch to be encodable. found: " + entry.getLastModDate());
+              break;
+            case "dos.txt":
+              var year = entry.getLastModDate().getFullYear();
+              if (!(1979 <= year && year <= 1981)) throw new Error("expected dos format year to be clamped to 1980ish. found: " + entry.getLastModDate());
+              break;
+            default: throw new Error(entry.fileName);
+          }
+        });
+        zipfile.on("end", function() {
+          console.log("timestamp encodings: pass");
+        });
+      });
+    }));
+  });
+})();
+
+// Test:
 //  * forceZip64Format for various subsets of entries.
 //  * specifying size for addReadStream.
 //  * calculatedTotalSize should always be known.

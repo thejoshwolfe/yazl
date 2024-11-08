@@ -26,7 +26,7 @@
     "buffer-crc32": "^1.0.0"
   },
   "devDependencies": {
-    "yauzl": "^3.1.3"
+    "yauzl": "^3.2.0"
   },
   "files": [
     "index.js"
