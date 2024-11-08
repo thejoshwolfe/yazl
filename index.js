@@ -601,7 +601,7 @@ Entry.prototype.getCentralDirectoryRecord = function() {
     var EB_UT_FL_ATIME = (1 << 1);
     // Note that we set the atime flag despite not providing the atime field.
     // The central directory version of this extra field is specified to never contain the atime field even when the flag is set.
-    // We set it to match the Info-ZIP behavior in order to minimize incompatibility with other file readers that may have rigid input expectations.
+    // We set it to match the Info-ZIP behavior in order to minimize incompatibility with zip file readers that may have rigid input expectations.
     // Flags         Byte        info bits
     izutefBuffer.writeUInt8(EB_UT_FL_MTIME | EB_UT_FL_ATIME, 4);
     // (ModTime)     Long        time of last modification (UTC/GMT)
