@@ -65,6 +65,7 @@ After UTF-8 encoding, `metadataPath` must be at most `0xffff` bytes in length.
   compress: true,
   compressionLevel: 6,
   forceZip64Format: false,
+  forceDosTimestamp: false,
   fileComment: "", // or a UTF-8 Buffer
 }
 ```
@@ -85,6 +86,14 @@ If both `compress` and `compressionLevel` are given, asserts that they do not co
 If `forceZip64Format` is `true`, yazl will use ZIP64 format in this entry's Data Descriptor
 and Central Directory Record even if not needed (this may be useful for testing.).
 Otherwise, yazl will use ZIP64 format where necessary.
+
+Since yazl version 3.3.0, yazl includes the Info-ZIP "universal timestamp" extended field (`0x5455` aka `"UT"`) to encode the `mtime`.
+The Info-ZIP timestamp is a more modern encoding for the mtime and is generally recommended.
+Set `forceDosTimestamp` to `true` to revert to the pre-3.3.0 behvior, disabling this extended field.
+The DOS encoding is always included regardless of this option, because it is required in the fixed-size metadata of every archive entry.
+The benefits of the Info-ZIP encoding include: timezone is specified as always UTC, which is better for cloud environments and any teams working in multiple timezones; capable of encoding "time 0", the unix epoch in 1970, which is better for some package managers; the precision is 1-second accurate rather than rounded to the nearest even second. The disadvantages of including this field are: it requires an extra 9 bytes of metadata per entry added to the archive.
+
+When attempting to encode an `mtime` outside the supported range for either format, such as the year 1970 in the DOS format or the year 2039 for the modern format, the time will clamped to the closest supported time.
 
 If `fileComment` is a `string`, it will be encoded with UTF-8.
 If `fileComment` is a `Buffer`, it should be a UTF-8 encoded string.
@@ -126,12 +135,13 @@ See `addFile()` for the meaning of the `metadataPath` parameter.
   compress: true,
   compressionLevel: 6,
   forceZip64Format: false,
+  forceDosTimestamp: false,
   fileComment: "", // or a UTF-8 Buffer
   size: 12345, // example value
 }
 ```
 
-See `addFile()` for the meaning of `mtime`, `mode`, `compress`, `compressionLevel`, `forceZip64Format`, and `fileComment`.
+See `addFile()` for the meaning of `mtime`, `mode`, `compress`, `compressionLevel`, `forceZip64Format`, `forceDosTimestamp`, and `fileComment`.
 If `size` is given, it will be checked against the actual number of bytes in the `readStream`,
 and an error will be emitted if there is a mismatch.
 See the documentation on `calculatedTotalSizeCallback` for why the `size` option exists.
@@ -162,11 +172,12 @@ See `addFile()` for info about the `metadataPath` parameter.
   compress: true,
   compressionLevel: 6,
   forceZip64Format: false,
+  forceDosTimestamp: false,
   fileComment: "", // or a UTF-8 Buffer
 }
 ```
 
-See `addFile()` for the meaning of `mtime`, `mode`, `compress`, `compressionLevel`, `forceZip64Format`, and `fileComment`.
+See `addFile()` for the meaning of `mtime`, `mode`, `compress`, `compressionLevel`, `forceZip64Format`, `forceDosTimestamp`, and `fileComment`.
 
 This method has the unique property that General Purpose Bit `3` will not be used in the Local File Header.
 This doesn't matter for unzip implementations that conform to the Zip File Spec.
@@ -210,10 +221,11 @@ If `metadataPath` does not end with a `"/"`, a `"/"` will be appended.
 {
   mtime: new Date(),
   mode: 040775,
+  forceDosTimestamp: false,
 }
 ```
 
-See `addFile()` for the meaning of `mtime` and `mode`.
+See `addFile()` for the meaning of `mtime`, `mode`, and `forceDosTimestamp`.
 
 #### end([options], [calculatedTotalSizeCallback])
 
@@ -285,8 +297,13 @@ In certain versions of node, you cannot use both `.on('data')` and `.pipe()` suc
 
 ### dateToDosDateTime(jsDate)
 
-`jsDate` is a `Date` instance.
-Returns `{date: date, time: time}`, where `date` and `time` are unsigned 16-bit integers.
+*Deprecated* since yazl 3.3.0.
+
+This function only remains exported in order to maintain compatibility with older versions of yazl.
+It will be removed in yazl 4.0.0 unless someone asks for it to remain supported.
+If you ever have a use case for calling this function directly please
+[open an issue against yazl](https://github.com/thejoshwolfe/yazl/issues/new)
+requesting that this function be properly supported again.
 
 ## Regarding ZIP64 Support
 

@@ -279,6 +279,9 @@ function calculateTotalSize(self) {
     }
 
     centralDirectorySize += CENTRAL_DIRECTORY_RECORD_FIXED_SIZE + entry.utf8FileName.length + entry.fileComment.length;
+    if (!entry.forceDosTimestamp) {
+      centralDirectorySize += INFO_ZIP_UNIVERSAL_TIMESTAMP_EXTRA_FIELD_SIZE;
+    }
     if (useZip64Format) {
       centralDirectorySize += ZIP64_EXTENDED_INFORMATION_EXTRA_FIELD_SIZE;
     }
@@ -427,6 +430,7 @@ function Entry(metadataPath, isDirectory, options) {
   this.isDirectory = isDirectory;
   this.state = Entry.WAITING_FOR_METADATA;
   this.setLastModDate(options.mtime != null ? options.mtime : new Date());
+  this.forceDosTimestamp = !!options.forceDosTimestamp;
   if (options.mode != null) {
     this.setFileAttributesMode(options.mode);
   } else {
@@ -469,6 +473,7 @@ Entry.READY_TO_PUMP_FILE_DATA = 1;
 Entry.FILE_DATA_IN_PROGRESS = 2;
 Entry.FILE_DATA_DONE = 3;
 Entry.prototype.setLastModDate = function(date) {
+  this.mtime = date;
   var dosDateTime = dateToDosDateTime(date);
   this.lastModFileTime = dosDateTime.time;
   this.lastModFileDate = dosDateTime.date;
@@ -575,17 +580,42 @@ Entry.prototype.getDataDescriptor = function() {
   }
 };
 var CENTRAL_DIRECTORY_RECORD_FIXED_SIZE = 46;
+var INFO_ZIP_UNIVERSAL_TIMESTAMP_EXTRA_FIELD_SIZE = 9;
 var ZIP64_EXTENDED_INFORMATION_EXTRA_FIELD_SIZE = 28;
 Entry.prototype.getCentralDirectoryRecord = function() {
   var fixedSizeStuff = bufferAlloc(CENTRAL_DIRECTORY_RECORD_FIXED_SIZE);
   var generalPurposeBitFlag = FILE_NAME_IS_UTF8;
   if (!this.crcAndFileSizeKnown) generalPurposeBitFlag |= UNKNOWN_CRC32_AND_FILE_SIZES;
 
+  var izutefBuffer = EMPTY_BUFFER;
+  if (!this.forceDosTimestamp) {
+    // Here is one specification for this: https://commons.apache.org/proper/commons-compress/apidocs/org/apache/commons/compress/archivers/zip/X5455_ExtendedTimestamp.html
+    // See also the Info-ZIP source code unix/unix.c:set_extra_field() and zipfile.c:ef_scan_ut_time().
+    izutefBuffer = bufferAlloc(INFO_ZIP_UNIVERSAL_TIMESTAMP_EXTRA_FIELD_SIZE);
+    // 0x5455        Short       tag for this extra block type ("UT")
+    izutefBuffer.writeUInt16LE(0x5455, 0);
+    // TSize         Short       total data size for this block
+    izutefBuffer.writeUInt16LE(INFO_ZIP_UNIVERSAL_TIMESTAMP_EXTRA_FIELD_SIZE - 4, 2);
+    // See Info-ZIP source code zip.h for these constant values:
+    var EB_UT_FL_MTIME = (1 << 0);
+    var EB_UT_FL_ATIME = (1 << 1);
+    // Note that we set the atime flag despite not providing the atime field.
+    // The central directory version of this extra field is specified to never contain the atime field even when the flag is set.
+    // We set it to match the Info-ZIP behavior in order to minimize incompatibility with zip file readers that may have rigid input expectations.
+    // Flags         Byte        info bits
+    izutefBuffer.writeUInt8(EB_UT_FL_MTIME | EB_UT_FL_ATIME, 4);
+    // (ModTime)     Long        time of last modification (UTC/GMT)
+    var timestamp = Math.floor(this.mtime.getTime() / 1000);
+    if (timestamp < -0x80000000) timestamp = -0x80000000; // 1901-12-13T20:45:52.000Z
+    if (timestamp >  0x7fffffff) timestamp =  0x7fffffff; // 2038-01-19T03:14:07.000Z
+    izutefBuffer.writeUInt32LE(timestamp, 5);
+  }
+
   var normalCompressedSize = this.compressedSize;
   var normalUncompressedSize = this.uncompressedSize;
   var normalRelativeOffsetOfLocalHeader = this.relativeOffsetOfLocalHeader;
-  var versionNeededToExtract;
-  var zeiefBuffer;
+  var versionNeededToExtract = VERSION_NEEDED_TO_EXTRACT_UTF8;
+  var zeiefBuffer = EMPTY_BUFFER;
   if (this.useZip64Format()) {
     normalCompressedSize = 0xffffffff;
     normalUncompressedSize = 0xffffffff;
@@ -606,9 +636,6 @@ Entry.prototype.getCentralDirectoryRecord = function() {
     writeUInt64LE(zeiefBuffer, this.relativeOffsetOfLocalHeader, 20);
     // Disk Start Number       4 bytes    Number of the disk on which this file starts
     // (omit)
-  } else {
-    versionNeededToExtract = VERSION_NEEDED_TO_EXTRACT_UTF8;
-    zeiefBuffer = EMPTY_BUFFER;
   }
 
   // central file header signature   4 bytes  (0x02014b50)
@@ -634,7 +661,7 @@ Entry.prototype.getCentralDirectoryRecord = function() {
   // file name length                2 bytes
   fixedSizeStuff.writeUInt16LE(this.utf8FileName.length, 28);
   // extra field length              2 bytes
-  fixedSizeStuff.writeUInt16LE(zeiefBuffer.length, 30);
+  fixedSizeStuff.writeUInt16LE(izutefBuffer.length + zeiefBuffer.length, 30);
   // file comment length             2 bytes
   fixedSizeStuff.writeUInt16LE(this.fileComment.length, 32);
   // disk number start               2 bytes
@@ -651,6 +678,7 @@ Entry.prototype.getCentralDirectoryRecord = function() {
     // file name (variable size)
     this.utf8FileName,
     // extra field (variable size)
+    izutefBuffer,
     zeiefBuffer,
     // file comment (variable size)
     this.fileComment,
@@ -662,7 +690,15 @@ Entry.prototype.getCompressionMethod = function() {
   return this.compressionLevel === 0 ? NO_COMPRESSION : DEFLATE_COMPRESSION;
 };
 
+// These are intentionally computed in the current system timezone
+// to match how the DOS encoding operates in this library.
+var minDosDate = new Date(1980, 0, 1);
+var maxDosDate = new Date(2107, 11, 31, 23, 59, 58);
 function dateToDosDateTime(jsDate) {
+  // Clamp out of bounds timestamps.
+  if (jsDate < minDosDate) jsDate = minDosDate;
+  else if (jsDate > maxDosDate) jsDate = maxDosDate;
+
   var date = 0;
   date |= jsDate.getDate() & 0x1f; // 1-31
   date |= ((jsDate.getMonth() + 1) & 0xf) << 5; // 0-11, 1-12
