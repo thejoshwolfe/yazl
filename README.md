@@ -402,7 +402,7 @@ Instead, each of the fields is limited to 65,535 bytes due to the length of each
 ## Change History
 
 * 3.3.0 (2024-Nov-08)
-    * Add support for encoding timestamps in the more modern Info-ZIP "universal timestamp" extended field (`0x5455` aka `"UT"`): supports years as old as 1901 instead of only 1980, notably including 1970; encodes timestamp in UTC rather than an unspecified system-dependent local timezone.
+    * Add support for encoding timestamps in the more modern Info-ZIP "universal timestamp" extended field (`0x5455` aka `"UT"`): supports years as old as 1901 instead of only 1980, notably including 1970; encodes timestamp in UTC rather than an unspecified system-dependent local timezone. [pull #86](https://github.com/thejoshwolfe/yazl/pull/86)
     * Disable spending the extra 9 bytes of metadata per entry with `forceDosTimestamp:true`.
     * Out-of-bounds timestamps are now clamped rather than overflowing/underflowing and wrapping around.
     * Marked `dateToDosDateTime()` as deprecated.
