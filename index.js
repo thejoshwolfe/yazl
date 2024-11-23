@@ -69,9 +69,9 @@ ZipFile.prototype.addReadStreamLazy = function(metadataPath, options, getReadStr
   var entry = new Entry(metadataPath, false, options);
   self.entries.push(entry);
   entry.setFileDataPumpFunction(function() {
+    entry.state = Entry.FILE_DATA_IN_PROGRESS;
     getReadStreamFunction(function(err, readStream) {
       if (err) return self.emit("error", err);
-      entry.state = Entry.FILE_DATA_IN_PROGRESS;
       pumpFileDataReadStream(self, entry, readStream);
     });
   });
