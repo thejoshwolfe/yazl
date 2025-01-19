@@ -154,7 +154,7 @@ Here's an example call to this method to illustrate the function callbacks:
 ```js
 zipfile.addReadStreamLazy("path/in/archive.txt", function(cb) {
   var readStream = getTheReadStreamSomehow();
-  cb(readStream);
+  cb(null, readStream);
 });
 ```
 
