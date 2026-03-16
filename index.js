@@ -50,6 +50,28 @@ ZipFile.prototype.addFile = function(realPath, metadataPath, options) {
   });
 };
 
+ZipFile.prototype.addSymlink = function(realPath, metadataPath, options) {
+  var self = this;
+  fs.lstat(realPath, function(err, stats) {
+    if (err)
+      return self.emit("error", err);
+    if (!stats.isSymbolicLink())
+      return self.emit("error", new Error("\"" + readPath + "\" is not a symbolic link"));
+    fs.readlink(realPath, { encoding: "utf8" }, function (err, linkString) {
+      if (err)
+        return self.emit("error", err);
+      var buffer = Buffer.from(linkString);
+      if (!options) options = {};
+      if (!options.mode) options.mode = stats.mode;
+      else if (options.mode >>> 28 !== 10)
+        return self.emit("error", new Error("\"" + options.mode + "\" gives the wrong entry type for a symbolic link"));
+      if (!options.compress) options.compress = false;
+      
+      self.addBuffer(buffer, metadataPath, options);
+    })
+  });
+};
+
 ZipFile.prototype.addReadStream = function(readStream, metadataPath, options) {
   this.addReadStreamLazy(metadataPath, options, function(cb) {
     cb(null, readStream);
