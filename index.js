@@ -14,6 +14,7 @@ util.inherits(ZipFile, EventEmitter);
 function ZipFile() {
   this.outputStream = new PassThrough();
   this.entries = [];
+  this.firstNotDoneEntryIndex = 0;
   this.outputStreamCursor = 0;
   this.ended = false; // .end() sets this
   this.allDone = false; // set when we've written the last bytes
@@ -218,10 +219,14 @@ function pumpEntries(self) {
   // pump entries
   var entry = getFirstNotDoneEntry();
   function getFirstNotDoneEntry() {
-    for (var i = 0; i < self.entries.length; i++) {
+    for (var i = self.firstNotDoneEntryIndex; i < self.entries.length; i++) {
       var entry = self.entries[i];
-      if (entry.state < Entry.FILE_DATA_DONE) return entry;
+      if (entry.state < Entry.FILE_DATA_DONE) {
+        self.firstNotDoneEntryIndex = i;
+        return entry;
+      }
     }
+    self.firstNotDoneEntryIndex = self.entries.length;
     return null;
   }
   if (entry != null) {
