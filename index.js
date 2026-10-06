@@ -95,7 +95,10 @@ ZipFile.prototype.addBuffer = function(buffer, metadataPath, options) {
     setCompressedBuffer(buffer);
   } else {
     zlib.deflateRaw(buffer, {level:entry.compressionLevel}, function(err, compressedBuffer) {
-      setCompressedBuffer(compressedBuffer);
+      // TODO (43081j): maybe raise an error here?
+      if (compressedBuffer) {
+        setCompressedBuffer(compressedBuffer);
+      }
     });
   }
   function setCompressedBuffer(compressedBuffer) {
@@ -290,7 +293,7 @@ function calculateTotalSize(self) {
   var endOfCentralDirectorySize = 0;
   if (self.forceZip64Eocd ||
       self.entries.length >= 0xffff ||
-      centralDirectorySize >= 0xffff ||
+      centralDirectorySize >= 0xffffffff ||
       pretendOutputCursor >= 0xffffffff) {
     // use zip64 end of central directory stuff
     endOfCentralDirectorySize += ZIP64_END_OF_CENTRAL_DIRECTORY_RECORD_SIZE + ZIP64_END_OF_CENTRAL_DIRECTORY_LOCATOR_SIZE;
@@ -308,7 +311,7 @@ function shouldIgnoreAdding(self) {
 var ZIP64_END_OF_CENTRAL_DIRECTORY_RECORD_SIZE = 56;
 var ZIP64_END_OF_CENTRAL_DIRECTORY_LOCATOR_SIZE = 20;
 var END_OF_CENTRAL_DIRECTORY_RECORD_SIZE = 22;
-function getEndOfCentralDirectoryRecord(self, actuallyJustTellMeHowLongItWouldBe) {
+function getEndOfCentralDirectoryRecord(self) {
   var needZip64Format = false;
   var normalEntriesLength = self.entries.length;
   if (self.forceZip64Eocd || self.entries.length >= 0xffff) {
@@ -325,17 +328,6 @@ function getEndOfCentralDirectoryRecord(self, actuallyJustTellMeHowLongItWouldBe
   if (self.forceZip64Eocd || self.offsetOfStartOfCentralDirectory >= 0xffffffff) {
     normalOffsetOfStartOfCentralDirectory = 0xffffffff;
     needZip64Format = true;
-  }
-  if (actuallyJustTellMeHowLongItWouldBe) {
-    if (needZip64Format) {
-      return (
-        ZIP64_END_OF_CENTRAL_DIRECTORY_RECORD_SIZE +
-        ZIP64_END_OF_CENTRAL_DIRECTORY_LOCATOR_SIZE +
-        END_OF_CENTRAL_DIRECTORY_RECORD_SIZE
-      );
-    } else {
-      return END_OF_CENTRAL_DIRECTORY_RECORD_SIZE;
-    }
   }
 
   var eocdrBuffer = bufferAlloc(END_OF_CENTRAL_DIRECTORY_RECORD_SIZE + self.comment.length);
@@ -426,7 +418,7 @@ var EMPTY_BUFFER = bufferAlloc(0);
 // this class is not part of the public API
 function Entry(metadataPath, isDirectory, options) {
   this.utf8FileName = bufferFrom(metadataPath);
-  if (this.utf8FileName.length > 0xffff) throw new Error("utf8 file name too long. " + utf8FileName.length + " > " + 0xffff);
+  if (this.utf8FileName.length > 0xffff) throw new Error("utf8 file name too long. " + this.utf8FileName.length + " > " + 0xffff);
   this.isDirectory = isDirectory;
   this.state = Entry.WAITING_FOR_METADATA;
   this.setLastModDate(options.mtime != null ? options.mtime : new Date());
@@ -608,7 +600,7 @@ Entry.prototype.getCentralDirectoryRecord = function() {
     var timestamp = Math.floor(this.mtime.getTime() / 1000);
     if (timestamp < -0x80000000) timestamp = -0x80000000; // 1901-12-13T20:45:52.000Z
     if (timestamp >  0x7fffffff) timestamp =  0x7fffffff; // 2038-01-19T03:14:07.000Z
-    izutefBuffer.writeUInt32LE(timestamp, 5);
+    izutefBuffer.writeInt32LE(timestamp, 5);
   }
 
   var normalCompressedSize = this.compressedSize;
@@ -692,12 +684,15 @@ Entry.prototype.getCompressionMethod = function() {
 
 // These are intentionally computed in the current system timezone
 // to match how the DOS encoding operates in this library.
-var minDosDate = new Date(1980, 0, 1);
-var maxDosDate = new Date(2107, 11, 31, 23, 59, 58);
+const minDosDate = new Date(1980, 0, 1);
+const maxDosDate = new Date(2107, 11, 31, 23, 59, 58);
+const minDosTime = minDosDate.getTime();
+const maxDosTime = maxDosDate.getTime();
 function dateToDosDateTime(jsDate) {
   // Clamp out of bounds timestamps.
-  if (jsDate < minDosDate) jsDate = minDosDate;
-  else if (jsDate > maxDosDate) jsDate = maxDosDate;
+  const jsTime = jsDate.getTime();
+  if (jsTime < minDosTime) jsDate = minDosDate;
+  else if (jsTime > maxDosTime) jsDate = maxDosDate;
 
   var date = 0;
   date |= jsDate.getDate() & 0x1f; // 1-31
@@ -718,10 +713,6 @@ function writeUInt64LE(buffer, n, offset) {
   var low = n % 0x100000000;
   buffer.writeUInt32LE(low, offset);
   buffer.writeUInt32LE(high, offset + 4);
-}
-
-function defaultCallback(err) {
-  if (err) throw err;
 }
 
 util.inherits(ByteCounter, Transform);

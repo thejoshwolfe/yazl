@@ -135,6 +135,26 @@ var BufferList = require("./bl-minimal.js");
 })();
 
 // Test:
+//  * specifying mtime before the unix epoch is encoded as a signed unix timestamp.
+(function() {
+  var mtime = new Date(Date.UTC(1960, 0, 1));
+  var zipfile = new yazl.ZipFile();
+  zipfile.addBuffer(bufferFrom("hello"), "1960.txt", {mtime: mtime});
+  zipfile.end(function() {
+    zipfile.outputStream.pipe(new BufferList(function(err, data) {
+      if (err) throw err;
+      yauzl.fromBuffer(data, function(err, zipfile) {
+        if (err) throw err;
+        zipfile.on("entry", function(entry) {
+          if (entry.getLastModDate().getTime() !== mtime.getTime()) throw new Error("expected pre-1970 timestamp to be encodable. found: " + entry.getLastModDate());
+          console.log("pre-1970 timestamp: pass");
+        });
+      });
+    }));
+  });
+})();
+
+// Test:
 //  * forceZip64Format for various subsets of entries.
 //  * specifying size for addReadStream.
 //  * calculatedTotalSize should always be known.
@@ -175,6 +195,23 @@ var BufferList = require("./bl-minimal.js");
         console.log("calculatedTotalSize(" + zip64Config.join("") + "): pass");
       }));
     });
+  });
+})();
+
+// Test:
+//  * calculatedTotalSize is correct when the central directory exceeds 0xffff bytes.
+(function() {
+  var zipfile = new yazl.ZipFile();
+  for (var i = 0; i < 1000; i++) {
+    zipfile.addBuffer(bufferFrom("hello"), "file" + i + ".txt", {compress: false});
+  }
+  zipfile.end(function(calculatedTotalSize) {
+    if (calculatedTotalSize === -1) throw new Error("calculatedTotalSize should be known");
+    zipfile.outputStream.pipe(new BufferList(function(err, data) {
+      if (err) throw err;
+      if (data.length !== calculatedTotalSize) throw new Error("calculatedTotalSize prediction is wrong. " + calculatedTotalSize + " !== " + data.length);
+      console.log("calculatedTotalSize(large central directory): pass");
+    }));
   });
 })();
 
